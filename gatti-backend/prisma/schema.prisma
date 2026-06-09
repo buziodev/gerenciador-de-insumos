@@ -1,0 +1,518 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTENTICAÇÃO E AUTORIZAÇÃO
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(VIEWER)
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  // Relacionamentos
+  auditLogs AuditLog[]
+  sessions  Session[]
+  
+  @@index([email])
+  @@index([role])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  OPERATOR
+  VIEWER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  refreshToken String @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([refreshToken])
+}
+
+// ============================================================================
+// IMPRESSORAS
+// ============================================================================
+
+model Printer {
+  id              String   @id @default(cuid())
+  zabbixHostId    String   @unique
+  name            String
+  hostname        String   @unique
+  ipAddress       String
+  model           String
+  manufacturer    String
+  serialNumber    String?
+  group           String
+  status          PrinterStatus @default(ONLINE)
+  
+  isActive        Boolean  @default(true)
+  lastSync        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relacionamentos
+  sector          Sector?  @relation(fields: [sectorId], references: [id])
+  sectorId        String?
+  
+  metrics         PrinterMetric[]
+  tonerLevels     TonerLevel[]
+  consumptionHistory ConsumptionHistory[]
+  tonerChanges    TonerChange[]
+  maintenanceHistory MaintenanceHistory[]
+  
+  @@index([zabbixHostId])
+  @@index([name])
+  @@index([hostname])
+  @@index([status])
+  @@index([sectorId])
+}
+
+enum PrinterStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+  ERROR
+}
+
+model Sector {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?
+  costCenter      String?
+  manager         String?
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relacionamentos
+  printers        Printer[]
+  
+  @@index([name])
+}
+
+// ============================================================================
+// MÉTRICAS E MONITORAMENTO
+// ============================================================================
+
+model PrinterMetric {
+  id              String   @id @default(cuid())
+  printerId       String
+  printer         Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  
+  pageCount       Int      @default(0)
+  pageCountPerMinute Float?
+  tonerLevel      Float?   // Percentual 0-100
+  printerStatus   String?
+  uptime          Int?     // em segundos
+  
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  
+  @@index([printerId])
+  @@index([recordedAt])
+  @@index([printerId, recordedAt])
+}
+
+model TonerLevel {
+  id              String   @id @default(cuid())
+  printerId       String
+  printer         Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  
+  color           TonerColor
+  percentageLevel Float    // 0-100
+  pageCount       Int      @default(0)
+  
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([printerId, color, recordedAt])
+  @@index([printerId])
+  @@index([color])
+  @@index([recordedAt])
+}
+
+enum TonerColor {
+  BLACK
+  CYAN
+  MAGENTA
+  YELLOW
+  WASTE
+}
+
+// ============================================================================
+// CONSUMO E PREVISÕES
+// ============================================================================
+
+model ConsumptionHistory {
+  id              String   @id @default(cuid())
+  printerId       String
+  printer         Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  
+  color           TonerColor
+  pagesProduced   Int
+  consumedPercentage Float
+  pagesPerPercent Float  // Páginas por 1% consumido
+  
+  dailyAverage    Float?
+  monthlyAverage  Float?
+  
+  recordedAt      DateTime
+  createdAt       DateTime @default(now())
+  
+  @@index([printerId])
+  @@index([color])
+  @@index([recordedAt])
+}
+
+model TonerChange {
+  id              String   @id @default(cuid())
+  printerId       String
+  printer         Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  
+  color           TonerColor
+  pagesProducedInCycle Int
+  cycleDurationDays Int
+  
+  previousLevel   Float
+  newLevel        Float
+  
+  detectedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  
+  @@index([printerId])
+  @@index([color])
+  @@index([detectedAt])
+}
+
+model TonerForecast {
+  id              String   @id @default(cuid())
+  printerId       String
+  
+  color           TonerColor
+  currentLevel    Float
+  daysRemaining   Int
+  pagesRemaining  Int
+  estimatedReplaceDate DateTime
+  
+  confidence      Float    // 0-100
+  basedOnDays     Int      // Dias de histórico usado
+  
+  calculatedAt    DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([printerId, color])
+  @@index([printerId])
+  @@index([estimatedReplaceDate])
+}
+
+// ============================================================================
+// SUPRIMENTOS
+// ============================================================================
+
+model Supply {
+  id              String   @id @default(cuid())
+  name            String
+  type            SupplyType
+  manufacturer    String
+  model           String?
+  compatibleModels String[] // Array de modelos compatíveis
+  
+  nominalCapacity Int      // Páginas
+  unitCost        Float
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relacionamentos
+  stockMovements  StockMovement[]
+  
+  @@index([type])
+  @@index([manufacturer])
+}
+
+enum SupplyType {
+  TONER
+  CYLINDER
+  FUSER
+  MAINTENANCE_KIT
+  SPARE_PART
+}
+
+// ============================================================================
+// ESTOQUE
+// ============================================================================
+
+model Stock {
+  id              String   @id @default(cuid())
+  supplyId        String   @unique
+  supply          Supply   @relation(fields: [supplyId], references: [id], onDelete: Cascade)
+  
+  quantity        Int      @default(0)
+  minimumLevel    Int      @default(5)
+  maximumLevel    Int      @default(100)
+  
+  lastCountedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([supplyId])
+}
+
+model StockMovement {
+  id              String   @id @default(cuid())
+  supplyId        String
+  supply          Supply   @relation(fields: [supplyId], references: [id], onDelete: Cascade)
+  
+  type            MovementType
+  quantity        Int
+  reason          String?
+  
+  fromLocation    String?
+  toLocation      String?
+  
+  createdBy       String
+  createdAt       DateTime @default(now())
+  
+  @@index([supplyId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum MovementType {
+  ENTRY
+  EXIT
+  TRANSFER
+  ADJUSTMENT
+  LOSS
+}
+
+// ============================================================================
+// MANUTENÇÃO
+// ============================================================================
+
+model MaintenanceHistory {
+  id              String   @id @default(cuid())
+  printerId       String
+  printer         Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  
+  type            MaintenanceType
+  description     String?
+  performedBy     String
+  
+  startDate       DateTime
+  endDate         DateTime?
+  status          MaintenanceStatus @default(PENDING)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([printerId])
+  @@index([status])
+  @@index([startDate])
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  CLEANING
+  PARTS_REPLACEMENT
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================================================
+// ALERTAS
+// ============================================================================
+
+model Alert {
+  id              String   @id @default(cuid())
+  printerId       String?
+  
+  type            AlertType
+  severity        AlertSeverity
+  message         String
+  
+  isActive        Boolean  @default(true)
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  resolvedAt      DateTime?
+  
+  @@index([type])
+  @@index([severity])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+enum AlertType {
+  LOW_TONER
+  CRITICAL_STOCK
+  PRINTER_OFFLINE
+  ABNORMAL_CONSUMPTION
+  OPERATIONAL_FAILURE
+  MAINTENANCE_DUE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// ============================================================================
+// AUDITORIA
+// ============================================================================
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action          String
+  entityType      String
+  entityId        String?
+  
+  oldValues       Json?
+  newValues       Json?
+  
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// RELATÓRIOS
+// ============================================================================
+
+model Report {
+  id              String   @id @default(cuid())
+  type            ReportType
+  title           String
+  description     String?
+  
+  generatedBy     String
+  generatedAt     DateTime @default(now())
+  
+  fileUrl         String?
+  fileSize        Int?
+  
+  filters         Json?    // Filtros aplicados
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([type])
+  @@index([generatedAt])
+}
+
+enum ReportType {
+  MONTHLY_CONSUMPTION
+  ANNUAL_CONSUMPTION
+  COSTS
+  TONER_CHANGES
+  STOCK_INVENTORY
+  PRINTER_PERFORMANCE
+}
+
+// ============================================================================
+// INTEGRAÇÃO ZABBIX
+// ============================================================================
+
+model ZabbixSync {
+  id              String   @id @default(cuid())
+  
+  lastSyncPrinters DateTime?
+  lastSyncMetrics  DateTime?
+  
+  totalPrinters   Int      @default(0)
+  totalMetrics    Int      @default(0)
+  
+  status          SyncStatus @default(IDLE)
+  errorMessage    String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum SyncStatus {
+  IDLE
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+// ============================================================================
+// JOBS
+// ============================================================================
+
+model JobExecution {
+  id              String   @id @default(cuid())
+  
+  jobName         String
+  status          JobStatus @default(PENDING)
+  
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  result          Json?
+  errorMessage    String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([jobName])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
