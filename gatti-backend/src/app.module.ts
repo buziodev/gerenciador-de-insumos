@@ -9,6 +9,8 @@ import { AlertsModule } from '@modules/alerts/alerts.module';
 import { ReportsModule } from '@modules/reports/reports.module';
 import { ZabbixModule } from '@integrations/zabbix/zabbix.module';
 import { HealthModule } from '@modules/health/health.module';
+import { UsersModule } from '@modules/users/users.module';
+import { SectorsModule } from '@modules/sectors/sectors.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { HealthModule } from '@modules/health/health.module';
     }),
     PrismaModule,
     AuthModule,
+    UsersModule,
+    SectorsModule,
     PrintersModule,
     SuppliesModule,
     StockModule,

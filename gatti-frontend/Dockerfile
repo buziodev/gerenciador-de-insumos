@@ -15,41 +15,42 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
+# Install dumb-init
 RUN apk add --no-cache dumb-init
 
 # Copy package files
 COPY package*.json ./
+COPY pnpm-lock.yaml ./
 
-# Install production dependencies only
+# Install production dependencies
 RUN npm install -g pnpm
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Copy built application
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-USER nodejs
+RUN adduser -S nextjs -u 1001
+USER nextjs
+
+# Expose port
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/api/v1/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Expose port
-EXPOSE 3001
-
-# Use dumb-init to handle signals properly
+# Use dumb-init
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application
-CMD ["node", "dist/main.js"]
+CMD ["pnpm", "start"]

@@ -1,12 +1,12 @@
-version: '3.8'
+version: '3.9'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: gatti-postgres
     environment:
       POSTGRES_USER: gatti
-      POSTGRES_PASSWORD: gatti123
+      POSTGRES_PASSWORD: gatti_secure_password_123
       POSTGRES_DB: gatti_db
     ports:
       - "5432:5432"
@@ -31,17 +31,64 @@ services:
       timeout: 5s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: gatti-pgadmin
+  backend:
+    build:
+      context: ./gatti-backend
+      dockerfile: Dockerfile
+    container_name: gatti-backend
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@gatti.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      NODE_ENV: production
+      DATABASE_URL: postgresql://gatti:gatti_secure_password_123@postgres:5432/gatti_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-jwt-secret-key-change-in-production
+      ZABBIX_API_URL: http://zabbix-api:8080/api_jsonrpc.php
+      ZABBIX_API_USER: Admin
+      ZABBIX_API_PASSWORD: zabbix
     ports:
-      - "5050:80"
+      - "3001:3001"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gatti-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./gatti-frontend
+      dockerfile: Dockerfile
+    container_name: gatti-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:3001/api/v1
+    depends_on:
+      - backend
+    networks:
+      - gatti-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: gatti-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - gatti-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  gatti-network:
+    driver: bridge
