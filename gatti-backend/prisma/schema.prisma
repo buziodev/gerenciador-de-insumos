@@ -16,7 +16,7 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
+  email     String   @unique @db.Citext
   password  String
   firstName String
   lastName  String
@@ -33,6 +33,7 @@ model User {
   
   @@index([email])
   @@index([role])
+  @@index([deletedAt])
 }
 
 enum UserRole {
@@ -65,7 +66,7 @@ model Printer {
   zabbixHostId    String   @unique
   name            String
   hostname        String   @unique
-  ipAddress       String
+  ipAddress       String   @db.Inet
   model           String
   manufacturer    String
   serialNumber    String?
@@ -91,8 +92,11 @@ model Printer {
   @@index([zabbixHostId])
   @@index([name])
   @@index([hostname])
+  @@index([ipAddress])
+  @@index([serialNumber])
   @@index([status])
   @@index([sectorId])
+  @@index([deletedAt])
 }
 
 enum PrinterStatus {
@@ -257,10 +261,13 @@ model Supply {
   deletedAt       DateTime?
 
   // Relacionamentos
+  stock           Stock?
   stockMovements  StockMovement[]
   
   @@index([type])
   @@index([manufacturer])
+  @@index([name])
+  @@index([deletedAt])
 }
 
 enum SupplyType {
@@ -287,8 +294,10 @@ model Stock {
   lastCountedAt   DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 
   @@index([supplyId])
+  @@index([deletedAt])
 }
 
 model StockMovement {
@@ -377,11 +386,13 @@ model Alert {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   resolvedAt      DateTime?
+  deletedAt       DateTime?
   
   @@index([type])
   @@index([severity])
   @@index([isActive])
   @@index([createdAt])
+  @@index([deletedAt])
 }
 
 enum AlertType {
@@ -415,7 +426,7 @@ model AuditLog {
   oldValues       Json?
   newValues       Json?
   
-  ipAddress       String?
+  ipAddress       String?  @db.Inet
   userAgent       String?
   
   createdAt       DateTime @default(now())
@@ -424,6 +435,7 @@ model AuditLog {
   @@index([action])
   @@index([entityType])
   @@index([createdAt])
+  @@index([ipAddress])
 }
 
 // ============================================================================

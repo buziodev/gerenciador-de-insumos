@@ -14,42 +14,42 @@ export class CreatePrinterDto {
     description: 'ID do host no Zabbix',
   })
   @IsString()
-  zabbixHostId: string;
+  zabbixHostId!: string;
 
   @ApiProperty({
     example: 'Impressora Sala 101',
     description: 'Nome da impressora',
   })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     example: 'printer-101.empresa.com',
     description: 'Hostname da impressora',
   })
   @IsString()
-  hostname: string;
+  hostname!: string;
 
   @ApiProperty({
     example: '192.168.1.100',
     description: 'Endereço IP da impressora',
   })
   @IsIP()
-  ipAddress: string;
+  ipAddress!: string;
 
   @ApiProperty({
     example: 'HP LaserJet Pro M404n',
     description: 'Modelo da impressora',
   })
   @IsString()
-  model: string;
+  model!: string;
 
   @ApiProperty({
     example: 'HP',
     description: 'Fabricante da impressora',
   })
   @IsString()
-  manufacturer: string;
+  manufacturer!: string;
 
   @ApiProperty({
     example: 'SN123456789',
@@ -65,7 +65,7 @@ export class CreatePrinterDto {
     description: 'Grupo no Zabbix',
   })
   @IsString()
-  group: string;
+  group!: string;
 
   @ApiProperty({
     enum: PrinterStatusEnum,

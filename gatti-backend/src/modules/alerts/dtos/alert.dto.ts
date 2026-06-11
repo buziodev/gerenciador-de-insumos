@@ -32,7 +32,7 @@ export class CreateAlertDto {
     description: 'Tipo de alerta',
   })
   @IsEnum(AlertTypeEnum)
-  type: AlertTypeEnum;
+  type!: AlertTypeEnum;
 
   @ApiProperty({
     enum: AlertSeverityEnum,
@@ -40,14 +40,14 @@ export class CreateAlertDto {
     description: 'Severidade do alerta',
   })
   @IsEnum(AlertSeverityEnum)
-  severity: AlertSeverityEnum;
+  severity!: AlertSeverityEnum;
 
   @ApiProperty({
     example: 'Toner preto com nível baixo (10%)',
     description: 'Mensagem do alerta',
   })
   @IsString()
-  message: string;
+  message!: string;
 }
 
 export class AcknowledgeAlertDto {
@@ -56,7 +56,7 @@ export class AcknowledgeAlertDto {
     description: 'ID do usuário que reconheceu o alerta',
   })
   @IsString()
-  acknowledgedBy: string;
+  acknowledgedBy!: string;
 }
 
 export class ListAlertsQueryDto {

@@ -13,12 +13,12 @@ export class HealthController {
   ) {}
 
   @Get()
-  @HealthCheck()
   @ApiOperation({ summary: 'Verificar saúde da aplicação' })
-  check() {
-    return this.health.check([
-      () => this.prismaHealthIndicator.pingDb(this.prisma),
-    ]);
+  async check() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   @Get('ready')

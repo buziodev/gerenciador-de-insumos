@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 @Injectable()
 export class ZabbixService {
   private readonly logger = new Logger(ZabbixService.name);
-  private authToken: string;
+  private authToken!: string;
 
   constructor(
     private httpService: HttpService,
@@ -154,13 +154,13 @@ export class ZabbixService {
       });
 
       this.logger.log(`Sincronização concluída: ${zabbixPrinters.length} impressoras`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Erro durante sincronização:', error);
 
       await this.prisma.zabbixSync.updateMany({
         data: {
           status: 'FAILED',
-          errorMessage: error.message,
+          errorMessage: error?.message || 'Erro desconhecido',
         },
       });
 

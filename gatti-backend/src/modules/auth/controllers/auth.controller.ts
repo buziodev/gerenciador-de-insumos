@@ -4,6 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { LoginDto, LoginResponseDto, RefreshTokenDto } from '../dtos/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { loginAttemptTracker } from '../../../config/rate-limit';
+import { RateLimitGuard } from '../../../common/guards/rate-limit.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -12,6 +13,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
   @ApiOperation({ summary: 'Realizar login' })
   async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
     // Verificar se o email está bloqueado por tentativas falhadas
@@ -40,6 +42,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
   @ApiOperation({ summary: 'Renovar token de acesso' })
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto): Promise<LoginResponseDto> {
     return this.authService.refreshToken(refreshTokenDto);

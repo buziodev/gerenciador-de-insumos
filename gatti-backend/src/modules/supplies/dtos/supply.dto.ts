@@ -15,7 +15,7 @@ export class CreateSupplyDto {
     description: 'Nome do suprimento',
   })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     enum: SupplyTypeEnum,
@@ -23,14 +23,14 @@ export class CreateSupplyDto {
     description: 'Tipo de suprimento',
   })
   @IsEnum(SupplyTypeEnum)
-  type: SupplyTypeEnum;
+  type!: SupplyTypeEnum;
 
   @ApiProperty({
     example: 'HP',
     description: 'Fabricante',
   })
   @IsString()
-  manufacturer: string;
+  manufacturer!: string;
 
   @ApiProperty({
     example: 'CE285A',
@@ -55,14 +55,14 @@ export class CreateSupplyDto {
     description: 'Capacidade nominal em páginas',
   })
   @IsNumber()
-  nominalCapacity: number;
+  nominalCapacity!: number;
 
   @ApiProperty({
     example: 85.50,
     description: 'Custo unitário',
   })
   @IsNumber()
-  unitCost: number;
+  unitCost!: number;
 }
 
 export class UpdateSupplyDto extends PartialType(CreateSupplyDto) {}

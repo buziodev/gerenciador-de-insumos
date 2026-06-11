@@ -15,7 +15,7 @@ export class CreateStockMovementDto {
     description: 'ID do suprimento',
   })
   @IsString()
-  supplyId: string;
+  supplyId!: string;
 
   @ApiProperty({
     enum: MovementTypeEnum,
@@ -23,14 +23,14 @@ export class CreateStockMovementDto {
     description: 'Tipo de movimentação',
   })
   @IsEnum(MovementTypeEnum)
-  type: MovementTypeEnum;
+  type!: MovementTypeEnum;
 
   @ApiProperty({
     example: 10,
     description: 'Quantidade movimentada',
   })
   @IsInt()
-  quantity: number;
+  quantity!: number;
 
   @ApiProperty({
     example: 'Compra fornecedor ABC',
@@ -64,7 +64,7 @@ export class CreateStockMovementDto {
     description: 'ID do usuário que criou o movimento',
   })
   @IsString()
-  createdBy: string;
+  createdBy!: string;
 }
 
 export class ListMovementsQueryDto {
@@ -109,12 +109,12 @@ export class UpdateStockLevelsDto {
     description: 'Nível mínimo de estoque',
   })
   @IsInt()
-  minimumLevel: number;
+  minimumLevel!: number;
 
   @ApiProperty({
     example: 100,
     description: 'Nível máximo de estoque',
   })
   @IsInt()
-  maximumLevel: number;
+  maximumLevel!: number;
 }

@@ -13,7 +13,7 @@ export class StockService {
     }
 
     // Usar transação para garantir consistência
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx: any) => {
       const supply = await tx.supply.findUnique({
         where: { id: createMovementDto.supplyId },
       });
@@ -108,6 +108,26 @@ export class StockService {
     return this.prisma.stock.findMany({
       include: { supply: true },
       orderBy: { lastUpdated: 'desc' },
+    });
+  }
+
+  async getCriticalStock() {
+    return this.prisma.stock.findMany({
+      where: {
+        quantity: {
+          lte: this.prisma.stock.fields.minimumLevel,
+        },
+      },
+      include: { supply: true },
+      orderBy: { quantity: 'asc' },
+    });
+  }
+
+  async updateStockLevels(supplyId: string, minimumLevel: number, maximumLevel: number) {
+    return this.prisma.stock.update({
+      where: { supplyId },
+      data: { minimumLevel, maximumLevel },
+      include: { supply: true },
     });
   }
 }

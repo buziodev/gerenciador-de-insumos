@@ -7,7 +7,7 @@ export class LoginDto {
     description: 'Email do usuário',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'password123',
@@ -15,24 +15,24 @@ export class LoginDto {
   })
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }
 
 export class LoginResponseDto {
   @ApiProperty({
     description: 'Token JWT de acesso',
   })
-  accessToken: string;
+  accessToken!: string;
 
   @ApiProperty({
     description: 'Token para renovação de sessão',
   })
-  refreshToken: string;
+  refreshToken!: string;
 
   @ApiProperty({
     description: 'Dados do usuário autenticado',
   })
-  user: {
+  user!: {
     id: string;
     email: string;
     firstName: string;
@@ -46,5 +46,5 @@ export class RefreshTokenDto {
     description: 'Token de renovação',
   })
   @IsString()
-  refreshToken: string;
+  refreshToken!: string;
 }

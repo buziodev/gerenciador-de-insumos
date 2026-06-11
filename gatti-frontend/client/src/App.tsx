@@ -13,6 +13,10 @@ import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import PrintersPage from "./pages/modules/Printers";
+import SuppliesPage from "./pages/modules/Supplies";
+import StockPage from "./pages/modules/Stock";
+import AlertsPage from "./pages/modules/Alerts";
+import ReportsPage from "./pages/modules/Reports";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -47,6 +51,46 @@ function Router() {
           <ProtectedRoute>
             <MainLayout>
               <PrintersPage />
+            </MainLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/supplies">
+        {() => (
+          <ProtectedRoute>
+            <MainLayout>
+              <SuppliesPage />
+            </MainLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/stock">
+        {() => (
+          <ProtectedRoute>
+            <MainLayout>
+              <StockPage />
+            </MainLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/alerts">
+        {() => (
+          <ProtectedRoute>
+            <MainLayout>
+              <AlertsPage />
+            </MainLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/reports">
+        {() => (
+          <ProtectedRoute>
+            <MainLayout>
+              <ReportsPage />
             </MainLayout>
           </ProtectedRoute>
         )}

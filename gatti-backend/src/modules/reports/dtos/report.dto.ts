@@ -17,14 +17,14 @@ export class GenerateReportDto {
     description: 'Tipo de relatório',
   })
   @IsEnum(ReportTypeEnum)
-  type: ReportTypeEnum;
+  type!: ReportTypeEnum;
 
   @ApiProperty({
     example: 'Consumo Mensal - Junho 2024',
     description: 'Título do relatório',
   })
   @IsString()
-  title: string;
+  title!: string;
 
   @ApiProperty({
     example: 'Relatório de consumo de toner por setor',
@@ -40,7 +40,7 @@ export class GenerateReportDto {
     description: 'ID do usuário que gerou o relatório',
   })
   @IsString()
-  generatedBy: string;
+  generatedBy!: string;
 
   @ApiProperty({
     example: { startDate: '2024-06-01', endDate: '2024-06-30' },
