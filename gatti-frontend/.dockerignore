@@ -1,13 +1,17 @@
 node_modules
 npm-debug.log
 .next
+dist
 .git
 .gitignore
 README.md
 .env.example
 .env
+.env.*
+!*.example
 .DS_Store
 coverage
+.manus-logs
 .eslintignore
 .prettierignore
 .vscode
