@@ -7,6 +7,7 @@ import {
   Body,
   UseGuards,
   Query,
+  Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -28,8 +29,11 @@ export class StockController {
   @Roles('ADMIN', 'MANAGER', 'OPERATOR')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar movimentação de estoque' })
-  async createMovement(@Body() createMovementDto: CreateStockMovementDto) {
-    return this.stockService.createMovement(createMovementDto);
+  async createMovement(@Body() createMovementDto: CreateStockMovementDto, @Request() req: any) {
+    return this.stockService.createMovement({
+      ...createMovementDto,
+      createdBy: req.user.userId,
+    });
   }
 
   @Get('movements')

@@ -14,56 +14,48 @@ export class StockService {
 
     // Usar transação para garantir consistência
     return await this.prisma.$transaction(async (tx: any) => {
-      const supply = await tx.supply.findUnique({
-        where: { id: createMovementDto.supplyId },
+      const supply = await tx.supply.findFirst({
+        where: { id: createMovementDto.supplyId, deletedAt: null },
       });
 
       if (!supply) {
         throw new NotFoundException(`Suprimento com ID ${createMovementDto.supplyId} não encontrado`);
       }
 
-      const stock = await tx.stock.findUnique({
-        where: { supplyId: createMovementDto.supplyId },
+      const stock = await tx.stock.findFirst({
+        where: { supplyId: createMovementDto.supplyId, deletedAt: null },
       });
 
       if (!stock) {
         throw new NotFoundException(`Estoque não encontrado para o suprimento ${createMovementDto.supplyId}`);
       }
 
-      // Validar quantidade para saída
-      if (
-        (createMovementDto.type === 'EXIT' || createMovementDto.type === 'TRANSFER') &&
-        stock.quantity < createMovementDto.quantity
-      ) {
-        throw new BadRequestException(
-          `Quantidade insuficiente em estoque. Disponível: ${stock.quantity}`,
-        );
-      }
-
-      // Criar movimento
-      const movement = await tx.stockMovement.create({
-        data: createMovementDto,
-      });
-
-      // Calcular nova quantidade
-      let newQuantity = stock.quantity;
-      if (createMovementDto.type === 'ENTRY') {
-        newQuantity += createMovementDto.quantity;
-      } else if (
-        createMovementDto.type === 'EXIT' ||
-        createMovementDto.type === 'TRANSFER' ||
-        createMovementDto.type === 'LOSS'
-      ) {
-        newQuantity -= createMovementDto.quantity;
+      const decrementTypes = ['EXIT', 'TRANSFER', 'LOSS'];
+      if (decrementTypes.includes(createMovementDto.type)) {
+        const update = await tx.stock.updateMany({
+          where: {
+            supplyId: createMovementDto.supplyId,
+            deletedAt: null,
+            quantity: { gte: createMovementDto.quantity },
+          },
+          data: { quantity: { decrement: createMovementDto.quantity } },
+        });
+        if (update.count !== 1) {
+          throw new BadRequestException('Quantidade insuficiente em estoque');
+        }
+      } else if (createMovementDto.type === 'ENTRY') {
+        await tx.stock.update({
+          where: { supplyId: createMovementDto.supplyId },
+          data: { quantity: { increment: createMovementDto.quantity } },
+        });
       } else if (createMovementDto.type === 'ADJUSTMENT') {
-        newQuantity = createMovementDto.quantity;
+        await tx.stock.update({
+          where: { supplyId: createMovementDto.supplyId },
+          data: { quantity: createMovementDto.quantity },
+        });
       }
 
-      // Atualizar estoque
-      await tx.stock.update({
-        where: { supplyId: createMovementDto.supplyId },
-        data: { quantity: newQuantity },
-      });
+      const movement = await tx.stockMovement.create({ data: createMovementDto });
 
       return movement;
     });
@@ -106,24 +98,34 @@ export class StockService {
 
   async getStockLevels() {
     return this.prisma.stock.findMany({
+      where: { deletedAt: null },
       include: { supply: true },
-      orderBy: { lastUpdated: 'desc' },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
   async getCriticalStock() {
-    return this.prisma.stock.findMany({
-      where: {
-        quantity: {
-          lte: this.prisma.stock.fields.minimumLevel,
-        },
-      },
+    const levels = await this.prisma.stock.findMany({
+      where: { deletedAt: null },
       include: { supply: true },
       orderBy: { quantity: 'asc' },
     });
+
+    return levels.filter((stock) => stock.quantity <= stock.minimumLevel);
   }
 
   async updateStockLevels(supplyId: string, minimumLevel: number, maximumLevel: number) {
+    if (minimumLevel < 0 || maximumLevel < minimumLevel) {
+      throw new BadRequestException('Os níveis de estoque são inválidos');
+    }
+
+    const stock = await this.prisma.stock.findFirst({
+      where: { supplyId, deletedAt: null },
+    });
+    if (!stock) {
+      throw new NotFoundException(`Estoque não encontrado para o suprimento ${supplyId}`);
+    }
+
     return this.prisma.stock.update({
       where: { supplyId },
       data: { minimumLevel, maximumLevel },

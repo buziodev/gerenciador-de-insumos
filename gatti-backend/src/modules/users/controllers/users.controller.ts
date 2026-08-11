@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Delete, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Delete, Param, Query, UseGuards, ParseEnumPipe } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
 import { CreateUserDto, UpdateUserDto, ChangePasswordDto, ListUsersQueryDto } from '../dtos/user.dto';
@@ -50,7 +51,7 @@ export class UsersController {
 
   @Patch(':id/role')
   @ApiOperation({ summary: 'Alterar papel do usuário' })
-  async updateRole(@Param('id') id: string, @Body('role') role: string) {
+  async updateRole(@Param('id') id: string, @Body('role', new ParseEnumPipe(UserRole)) role: UserRole) {
     return this.usersService.updateRole(id, role);
   }
 }

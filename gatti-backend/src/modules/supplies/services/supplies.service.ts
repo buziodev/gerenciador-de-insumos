@@ -7,21 +7,18 @@ export class SuppliesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createSupplyDto: CreateSupplyDto) {
-    const supply = await this.prisma.supply.create({
-      data: createSupplyDto,
+    return this.prisma.$transaction(async (tx: any) => {
+      const supply = await tx.supply.create({ data: createSupplyDto });
+      await tx.stock.create({
+        data: {
+          supplyId: supply.id,
+          quantity: 0,
+          minimumLevel: 5,
+          maximumLevel: 100,
+        },
+      });
+      return supply;
     });
-
-    // Criar registro de estoque inicial
-    await this.prisma.stock.create({
-      data: {
-        supplyId: supply.id,
-        quantity: 0,
-        minimumLevel: 5,
-        maximumLevel: 100,
-      },
-    });
-
-    return supply;
   }
 
   async findAll(query: ListSuppliesQueryDto) {
@@ -63,8 +60,8 @@ export class SuppliesService {
   }
 
   async findOne(id: string) {
-    const supply = await this.prisma.supply.findUnique({
-      where: { id },
+    const supply = await this.prisma.supply.findFirst({
+      where: { id, deletedAt: null },
     });
 
     if (!supply) {
@@ -86,17 +83,25 @@ export class SuppliesService {
   async remove(id: string) {
     await this.findOne(id);
 
-    return this.prisma.supply.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    return this.prisma.$transaction(async (tx: any) => {
+      const deletedAt = new Date();
+      const supply = await tx.supply.update({
+        where: { id },
+        data: { deletedAt },
+      });
+      await tx.stock.updateMany({
+        where: { supplyId: id, deletedAt: null },
+        data: { deletedAt },
+      });
+      return supply;
     });
   }
 
   async getStock(id: string) {
     const supply = await this.findOne(id);
 
-    return this.prisma.stock.findUnique({
-      where: { supplyId: id },
+    return this.prisma.stock.findFirst({
+      where: { supplyId: id, deletedAt: null },
     });
   }
 }

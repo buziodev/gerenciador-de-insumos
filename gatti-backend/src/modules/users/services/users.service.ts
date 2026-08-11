@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto, ChangePasswordDto, ListUsersQueryDto } from '../dtos/user.dto';
 
@@ -195,7 +196,7 @@ export class UsersService {
     });
   }
 
-  async updateRole(id: string, role: string) {
+  async updateRole(id: string, role: UserRole) {
     const user = await this.findOne(id);
 
     return this.prisma.user.update({
