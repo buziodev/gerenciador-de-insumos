@@ -1,162 +1,61 @@
+/** Página de movimentações de estoque alinhada ao DTO CreateStockMovement. */
 import { useState } from 'react';
+import { Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
-import { useStockMovements } from '@/hooks/useQueries';
-import { apiClient } from '@/config/api';
+import { useStockMovements, useSupplies } from '@/hooks/useQueries';
+import { stockService } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { MovementType } from '@/types';
+
+const MOVEMENT_LABELS: Record<MovementType, string> = {
+  [MovementType.ENTRY]: 'Entrada', [MovementType.EXIT]: 'Saída', [MovementType.TRANSFER]: 'Transferência', [MovementType.ADJUSTMENT]: 'Ajuste', [MovementType.LOSS]: 'Perda',
+};
 
 export default function StockPage() {
+  const { user } = useAuth();
+  const { data: movementResponse, isLoading, refetch } = useStockMovements();
+  const { data: supplyResponse, isLoading: isLoadingSupplies } = useSupplies();
+  const movements = movementResponse?.data ?? [];
+  const supplies = supplyResponse?.data ?? [];
   const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [search, setSearch] = useState('');
+  const [supplyId, setSupplyId] = useState('');
+  const [type, setType] = useState<MovementType>(MovementType.ENTRY);
   const [quantity, setQuantity] = useState('');
-  const [type, setType] = useState<'entrada' | 'saida'>('entrada');
+  const [reason, setReason] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const { data: stock = [], isLoading, refetch } = useStockMovements();
+  const visibleMovements = movements.filter((movement) => movement.supply?.name.toLowerCase().includes(search.toLowerCase()));
 
-  const handleMovement = async (supplyId: string) => {
-    try {
-      await apiClient.post(`/stock/movements`, {
-        supplyId,
-        quantity: parseInt(quantity),
-        type,
-        notes: 'Movimentação manual',
-      });
-      toast.success('Movimentação registrada com sucesso');
-      setOpen(false);
-      setQuantity('');
-      refetch();
-    } catch (error) {
-      toast.error('Erro ao registrar movimentação');
+  const resetDialog = () => { setSupplyId(''); setType(MovementType.ENTRY); setQuantity(''); setReason(''); };
+  const saveMovement = async () => {
+    const parsedQuantity = Number(quantity);
+    if (!user?.id || !supplyId || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+      toast.error('Selecione um suprimento e informe uma quantidade inteira positiva.');
+      return;
     }
+    try {
+      setIsSaving(true);
+      await stockService.createMovement({ supplyId, type, quantity: parsedQuantity, reason: reason.trim() || undefined, createdBy: user.id });
+      toast.success('Movimentação registrada com sucesso.');
+      setOpen(false);
+      resetDialog();
+      await refetch();
+    } catch {
+      toast.error('Não foi possível registrar a movimentação.');
+    } finally { setIsSaving(false); }
   };
 
-  const filteredStock = (Array.isArray(stock) ? stock : stock?.data || []).filter((item: any) =>
-    item.supply?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Estoque</h1>
-          <p className="text-muted-foreground">Gerencie movimentações de estoque</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Movimentação
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Movimentações de Estoque</CardTitle>
-          <CardDescription>Total: {filteredStock.length} registros</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Buscar por suprimento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <Button variant="outline">
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Suprimento</TableHead>
-                  <TableHead>Quantidade</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Data</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredStock.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      Nenhuma movimentação encontrada
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredStock.map((item: any) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.supply?.name}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{item.type === 'entrada' ? '📥 Entrada' : '📤 Saída'}</TableCell>
-                      <TableCell>{new Date(item.createdAt).toLocaleDateString()}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nova Movimentação</DialogTitle>
-            <DialogDescription>Registre uma movimentação de estoque</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label>Tipo</Label>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  variant={type === 'entrada' ? 'default' : 'outline'}
-                  onClick={() => setType('entrada')}
-                >
-                  📥 Entrada
-                </Button>
-                <Button
-                  variant={type === 'saida' ? 'default' : 'outline'}
-                  onClick={() => setType('saida')}
-                >
-                  📤 Saída
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="quantity">Quantidade</Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => handleMovement('')}>
-                Registrar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h1 className="text-3xl font-bold">Estoque</h1><p className="text-muted-foreground">Registre entradas, saídas e demais movimentações de suprimentos.</p></div><Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />Nova movimentação</Button></div>
+    <Card><CardHeader><CardTitle>Movimentações</CardTitle><CardDescription>{visibleMovements.length} registro(s) encontrado(s).</CardDescription></CardHeader><CardContent className="space-y-4"><div className="relative max-w-lg"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por suprimento" /></div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Suprimento</TableHead><TableHead>Quantidade</TableHead><TableHead>Tipo</TableHead><TableHead>Motivo</TableHead><TableHead>Data</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <TableRow><TableCell colSpan={5} className="text-center">Carregando…</TableCell></TableRow> : null}{!isLoading && visibleMovements.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhuma movimentação encontrada.</TableCell></TableRow> : null}{!isLoading && visibleMovements.map((movement) => <TableRow key={movement.id}><TableCell className="font-medium">{movement.supply?.name || movement.supplyId}</TableCell><TableCell>{movement.quantity}</TableCell><TableCell>{MOVEMENT_LABELS[movement.type]}</TableCell><TableCell>{movement.reason || '—'}</TableCell><TableCell>{new Date(movement.createdAt).toLocaleString('pt-BR')}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>
+    <Dialog open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) resetDialog(); }}><DialogContent><DialogHeader><DialogTitle>Nova movimentação</DialogTitle><DialogDescription>Os dados serão enviados ao endpoint transacional de estoque.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label>Suprimento</Label><Select value={supplyId} onValueChange={setSupplyId} disabled={isLoadingSupplies}><SelectTrigger><SelectValue placeholder={isLoadingSupplies ? 'Carregando suprimentos…' : 'Selecione um suprimento'} /></SelectTrigger><SelectContent>{supplies.map((supply) => <SelectItem key={supply.id} value={supply.id}>{supply.name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Tipo</Label><Select value={type} onValueChange={(value) => setType(value as MovementType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(MOVEMENT_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="stock-quantity">Quantidade</Label><Input id="stock-quantity" type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="stock-reason">Motivo</Label><Input id="stock-reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Opcional" /></div></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button disabled={isSaving} onClick={() => void saveMovement()}>{isSaving ? 'Registrando…' : 'Registrar'}</Button></div></DialogContent></Dialog>
+  </div>;
 }

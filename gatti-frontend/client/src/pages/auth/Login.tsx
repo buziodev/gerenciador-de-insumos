@@ -105,16 +105,6 @@ export default function Login() {
                 )}
               </Button>
 
-              {/* Informações de Teste */}
-              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                  Dados de teste:
-                </p>
-                <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded text-xs space-y-1">
-                  <p><strong>Email:</strong> admin@gatti.com</p>
-                  <p><strong>Senha:</strong> admin123</p>
-                </div>
-              </div>
             </form>
           </CardContent>
         </Card>

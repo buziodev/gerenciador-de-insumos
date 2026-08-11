@@ -13,8 +13,8 @@ export interface ApiConfig {
 }
 
 // Configuração padrão
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const API_PREFIX = import.meta.env.VITE_API_PREFIX || 'api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const API_PREFIX = (import.meta.env.VITE_API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '30000', 10);
 
 // Chaves de armazenamento
@@ -72,8 +72,15 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    // Nunca tentar renovar novamente uma solicitação de login/refresh inválida.
+    // Sem esta exceção, um 401 de /auth/refresh dispara outro /auth/refresh
+    // indefinidamente pelo próprio interceptor.
+    const isAuthRequest =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh');
+
     // Se erro 401 e não é tentativa de refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (isRefreshing) {
         // Aguardar refresh de token
         return new Promise((onSuccess, onFailed) => {

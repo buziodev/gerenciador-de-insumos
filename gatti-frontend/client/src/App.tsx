@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -10,7 +10,6 @@ import { MainLayout } from "./components/layout/MainLayout";
 import Login from "./pages/auth/Login";
 import Forbidden from "./pages/403";
 import NotFound from "./pages/NotFound";
-import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import PrintersPage from "./pages/modules/Printers";
 import PrinterDetailsPage from "./pages/modules/PrinterDetails";
@@ -124,10 +123,7 @@ function Router() {
       
       {/* Redirect root to dashboard */}
       <Route path="/">
-        {() => {
-          window.location.href = '/dashboard';
-          return null;
-        }}
+        <Redirect to="/dashboard" replace />
       </Route>
 
       {/* Fallback */}

@@ -1,6 +1,10 @@
+/**
+ * Página de suprimentos.
+ * Mantém o formulário e a tabela alinhados ao contrato Supply da API.
+ */
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { Plus, Pencil, Search, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,167 +12,148 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
-import { z } from 'zod';
 import { useSupplies } from '@/hooks/useQueries';
-import { apiClient } from '@/config/api';
+import { suppliesService } from '@/services/api';
+import { Supply, SupplyType } from '@/types';
 
-const SupplySchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório'),
-  sku: z.string().min(1, 'SKU é obrigatório'),
-  category: z.string().min(1, 'Categoria é obrigatória'),
-  description: z.string().optional().default(''),
-  unitPrice: z.any().transform(v => Number(v)).refine(v => v > 0, 'Preço deve ser positivo'),
-  minimumStock: z.any().transform(v => Number(v)).refine(v => v >= 0, 'Estoque mínimo deve ser não-negativo'),
-});
+type SupplyDraft = {
+  name: string;
+  type: SupplyType;
+  manufacturer: string;
+  model: string;
+  compatibleModels: string;
+  nominalCapacity: string;
+  unitCost: string;
+};
 
-type SupplyFormData = z.infer<typeof SupplySchema>;
+const EMPTY_DRAFT: SupplyDraft = {
+  name: '',
+  type: SupplyType.TONER,
+  manufacturer: '',
+  model: '',
+  compatibleModels: '',
+  nominalCapacity: '',
+  unitCost: '',
+};
+
+const TYPE_LABELS: Record<SupplyType, string> = {
+  [SupplyType.TONER]: 'Toner',
+  [SupplyType.CYLINDER]: 'Cilindro',
+  [SupplyType.FUSER]: 'Fusor',
+  [SupplyType.MAINTENANCE_KIT]: 'Kit de manutenção',
+  [SupplyType.SPARE_PART]: 'Peça de reposição',
+};
 
 export default function SuppliesPage() {
-
+  const { data, isLoading, refetch } = useSupplies();
+  const supplies = data?.data ?? [];
+  const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [editing, setEditing] = useState<Supply | null>(null);
+  const [draft, setDraft] = useState<SupplyDraft>(EMPTY_DRAFT);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const { data: suppliesResponse, isLoading, refetch } = useSupplies();
-  const supplies = Array.isArray(suppliesResponse) ? suppliesResponse : suppliesResponse?.data || [];
+  const filteredSupplies = supplies.filter((supply) =>
+    [supply.name, supply.manufacturer, supply.model].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase()),
+  );
 
-  const form = useForm<any>({
-    resolver: zodResolver(SupplySchema),
-    defaultValues: {
-      name: '',
-      sku: '',
-      category: '',
-      description: '',
-      unitPrice: 0,
-      minimumStock: 0,
-    },
-  });
-
-  const onSubmit = async (data: SupplyFormData) => {
-    try {
-      if (editingId) {
-        await apiClient.put(`/supplies/${editingId}`, data);
-        toast.success('Suprimento atualizado com sucesso');
-      } else {
-        await apiClient.post('/supplies', data);
-        toast.success('Suprimento criado com sucesso');
-      }
-      form.reset();
-      setOpen(false);
-      setEditingId(null);
-      refetch();
-    } catch (error) {
-      toast.error('Erro ao salvar suprimento');
-    }
-  };
-
-  const handleEdit = (supply: any): void => {
-    setEditingId(supply.id);
-    form.reset(supply);
+  const openCreate = () => {
+    setEditing(null);
+    setDraft(EMPTY_DRAFT);
     setOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar este suprimento?')) return;
+  const openEdit = (supply: Supply) => {
+    setEditing(supply);
+    setDraft({
+      name: supply.name,
+      type: supply.type,
+      manufacturer: supply.manufacturer,
+      model: supply.model || '',
+      compatibleModels: supply.compatibleModels.join(', '),
+      nominalCapacity: String(supply.nominalCapacity),
+      unitCost: String(supply.unitCost),
+    });
+    setOpen(true);
+  };
+
+  const saveSupply = async () => {
+    const nominalCapacity = Number(draft.nominalCapacity);
+    const unitCost = Number(draft.unitCost);
+    if (!draft.name.trim() || !draft.manufacturer.trim() || !Number.isInteger(nominalCapacity) || nominalCapacity <= 0 || !Number.isFinite(unitCost) || unitCost <= 0) {
+      toast.error('Informe nome, fabricante, capacidade inteira positiva e custo positivo.');
+      return;
+    }
+
+    const payload = {
+      name: draft.name.trim(),
+      type: draft.type,
+      manufacturer: draft.manufacturer.trim(),
+      model: draft.model.trim() || undefined,
+      compatibleModels: draft.compatibleModels.split(',').map((value) => value.trim()).filter(Boolean),
+      nominalCapacity,
+      unitCost,
+    };
+
     try {
-      await apiClient.delete(`/supplies/${id}`);
-      toast.success('Suprimento deletado com sucesso');
-      refetch();
-    } catch (error) {
-      toast.error('Erro ao deletar suprimento');
+      setIsSaving(true);
+      if (editing) {
+        await suppliesService.update(editing.id, payload);
+        toast.success('Suprimento atualizado com sucesso.');
+      } else {
+        await suppliesService.create(payload);
+        toast.success('Suprimento criado com sucesso.');
+      }
+      setOpen(false);
+      await refetch();
+    } catch {
+      toast.error('Não foi possível salvar o suprimento. Verifique os dados e a conexão com a API.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const filteredSupplies = supplies.filter((supply: any) =>
-    supply.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supply.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const removeSupply = async (supply: Supply) => {
+    if (!window.confirm(`Excluir o suprimento “${supply.name}”?`)) return;
+    try {
+      await suppliesService.delete(supply.id);
+      toast.success('Suprimento removido com sucesso.');
+      await refetch();
+    } catch {
+      toast.error('Não foi possível remover o suprimento.');
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold">Suprimentos</h1>
-          <p className="text-muted-foreground">Gerencie seus suprimentos e estoque</p>
+          <p className="text-muted-foreground">Cadastre e acompanhe itens compatíveis com as impressoras.</p>
         </div>
-        <Button onClick={() => { setEditingId(null); form.reset(); setOpen(true); }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Suprimento
-        </Button>
+        <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo suprimento</Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Suprimentos</CardTitle>
-          <CardDescription>Total: {filteredSupplies.length} suprimentos</CardDescription>
+          <CardTitle>Catálogo de suprimentos</CardTitle>
+          <CardDescription>{filteredSupplies.length} item(ns) encontrado(s).</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Buscar por nome ou SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <Button variant="outline">
-              <Search className="w-4 h-4" />
-            </Button>
+          <div className="relative max-w-lg">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, fabricante ou modelo" />
           </div>
-
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Preço Unitário</TableHead>
-                  <TableHead>Estoque Mínimo</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Tipo</TableHead><TableHead>Fabricante</TableHead><TableHead>Capacidade</TableHead><TableHead>Custo</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredSupplies.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      Nenhum suprimento encontrado
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredSupplies.map(supply => (
-                    <TableRow key={supply.id}>
-                      <TableCell>{supply.name}</TableCell>
-                      <TableCell>{supply.sku}</TableCell>
-                      <TableCell>{supply.category}</TableCell>
-                      <TableCell>R$ {supply.unitPrice?.toFixed(2)}</TableCell>
-                      <TableCell>{supply.minimumStock}</TableCell>
-                      <TableCell className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(supply)}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(supply.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                {isLoading ? <TableRow><TableCell colSpan={6} className="text-center">Carregando…</TableCell></TableRow> : null}
+                {!isLoading && filteredSupplies.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum suprimento encontrado.</TableCell></TableRow> : null}
+                {!isLoading && filteredSupplies.map((supply) => <TableRow key={supply.id}>
+                  <TableCell className="font-medium">{supply.name}</TableCell><TableCell>{TYPE_LABELS[supply.type]}</TableCell><TableCell>{supply.manufacturer}</TableCell><TableCell>{supply.nominalCapacity.toLocaleString('pt-BR')} pág.</TableCell><TableCell>{supply.unitCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                  <TableCell className="text-right"><Button size="icon" variant="ghost" aria-label={`Editar ${supply.name}`} onClick={() => openEdit(supply)}><Pencil className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={`Excluir ${supply.name}`} onClick={() => void removeSupply(supply)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                </TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -176,100 +161,18 @@ export default function SuppliesPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingId ? 'Editar Suprimento' : 'Novo Suprimento'}
-            </DialogTitle>
-            <DialogDescription>
-              Preencha os dados do suprimento
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nome</Label>
-              <Input
-                id="name"
-                {...form.register('name')}
-                placeholder="Ex: Toner Preto"
-              />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-500 mt-1">
-                  {typeof form.formState.errors.name === 'string' ? form.formState.errors.name : (form.formState.errors.name as any)?.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                {...form.register('sku')}
-                placeholder="Ex: TONER-BK-001"
-              />
-              {form.formState.errors.sku && (
-                <p className="text-sm text-red-500 mt-1">
-                  {typeof form.formState.errors.sku === 'string' ? form.formState.errors.sku : (form.formState.errors.sku as any)?.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="category">Categoria</Label>
-              <Select value={form.watch('category')} onValueChange={(value) => form.setValue('category', value)}>
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="toner">Toner</SelectItem>
-                  <SelectItem value="papel">Papel</SelectItem>
-                  <SelectItem value="manutencao">Manutenção</SelectItem>
-                  <SelectItem value="acessorios">Acessórios</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="unitPrice">Preço Unitário (R$)</Label>
-              <Input
-                id="unitPrice"
-                type="number"
-                step="0.01"
-                {...form.register('unitPrice')}
-                placeholder="0.00"
-              />
-              {form.formState.errors.unitPrice && (
-                <p className="text-sm text-red-500 mt-1">
-                  {typeof form.formState.errors.unitPrice === 'string' ? form.formState.errors.unitPrice : (form.formState.errors.unitPrice as any)?.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="minimumStock">Estoque Mínimo</Label>
-              <Input
-                id="minimumStock"
-                type="number"
-                {...form.register('minimumStock')}
-                placeholder="0"
-              />
-              {form.formState.errors.minimumStock && (
-                <p className="text-sm text-red-500 mt-1">
-                  {typeof form.formState.errors.minimumStock === 'string' ? form.formState.errors.minimumStock : (form.formState.errors.minimumStock as any)?.message}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">
-                {editingId ? 'Atualizar' : 'Criar'}
-              </Button>
-            </div>
-          </form>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader><DialogTitle>{editing ? 'Editar suprimento' : 'Novo suprimento'}</DialogTitle><DialogDescription>Os campos seguem o contrato da API de suprimentos.</DialogDescription></DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2"><Label htmlFor="supply-name">Nome</Label><Input id="supply-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
+            <div className="space-y-2"><Label>Tipo</Label><Select value={draft.type} onValueChange={(value) => setDraft({ ...draft, type: value as SupplyType })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label htmlFor="supply-manufacturer">Fabricante</Label><Input id="supply-manufacturer" value={draft.manufacturer} onChange={(event) => setDraft({ ...draft, manufacturer: event.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="supply-model">Modelo</Label><Input id="supply-model" value={draft.model} onChange={(event) => setDraft({ ...draft, model: event.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="supply-capacity">Capacidade nominal (páginas)</Label><Input id="supply-capacity" type="number" min="1" value={draft.nominalCapacity} onChange={(event) => setDraft({ ...draft, nominalCapacity: event.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="supply-cost">Custo unitário</Label><Input id="supply-cost" type="number" min="0.01" step="0.01" value={draft.unitCost} onChange={(event) => setDraft({ ...draft, unitCost: event.target.value })} /></div>
+            <div className="space-y-2 sm:col-span-2"><Label htmlFor="supply-compatible">Modelos compatíveis</Label><Input id="supply-compatible" value={draft.compatibleModels} onChange={(event) => setDraft({ ...draft, compatibleModels: event.target.value })} placeholder="Separe os modelos por vírgula" /></div>
+          </div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button disabled={isSaving} onClick={() => void saveSupply()}>{isSaving ? 'Salvando…' : 'Salvar'}</Button></div>
         </DialogContent>
       </Dialog>
     </div>

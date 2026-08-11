@@ -1,240 +1,99 @@
-/**
- * Printers Page
- * Página de gerenciamento de impressoras
- */
-
-import { useState } from 'react';
-import { Printer } from '@/types';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreatePrinterSchema, CreatePrinterFormData } from '@/lib/schemas';
-import { useApi } from '@/hooks/useApi';
-import { printersService } from '@/services/api';
+/** Página de impressoras alinhada aos contratos CreatePrinterRequest e UpdatePrinterRequest. */
+import { useEffect, useState } from 'react';
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { DataTable } from '@/components/tables/DataTable';
-import { MetricCard } from '@/components/common/MetricCard';
-import { StatusBadge } from '@/components/common/StatusBadge';
-import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import { FormField } from '@/components/forms/FormField';
-import { Plus, Trash2, Edit2, Eye } from 'lucide-react';
-import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { printersService } from '@/services/api';
+import { Printer, PrinterStatus } from '@/types';
+
+type PrinterDraft = {
+  zabbixHostId: string;
+  name: string;
+  hostname: string;
+  ipAddress: string;
+  model: string;
+  manufacturer: string;
+  group: string;
+  serialNumber: string;
+  sectorId: string;
+  status: PrinterStatus;
+};
+
+const EMPTY_DRAFT: PrinterDraft = {
+  zabbixHostId: '', name: '', hostname: '', ipAddress: '', model: '', manufacturer: '', group: '', serialNumber: '', sectorId: '', status: PrinterStatus.ONLINE,
+};
 
 export default function PrintersPage() {
   const [printers, setPrinters] = useState<Printer[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [selectedPrinter, setSelectedPrinter] = useState<any>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id?: string }>({ open: false });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Printer | null>(null);
+  const [draft, setDraft] = useState<PrinterDraft>(EMPTY_DRAFT);
 
-  const { control, handleSubmit, reset } = useForm<CreatePrinterFormData>({
-    resolver: zodResolver(CreatePrinterSchema),
-  });
-
-  // Carregar impressoras
   const loadPrinters = async () => {
     try {
       setIsLoading(true);
-      const data = await printersService.list({ skip: 0, take: 10 });
-      setPrinters(data.data);
-    } catch (error) {
-      toast.error('Erro ao carregar impressoras');
+      const response = await printersService.list({ skip: 0, take: 100 });
+      setPrinters(response.data);
+    } catch {
+      toast.error('Não foi possível carregar as impressoras.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Criar impressora
-  const onSubmit = async (data: CreatePrinterFormData) => {
+  useEffect(() => { void loadPrinters(); }, []);
+
+  const visiblePrinters = printers.filter((printer) => `${printer.name} ${printer.hostname} ${printer.model} ${printer.ipAddress}`.toLowerCase().includes(search.toLowerCase()));
+  const changeDraft = <K extends keyof PrinterDraft>(key: K, value: PrinterDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const openCreate = () => { setEditing(null); setDraft(EMPTY_DRAFT); setOpen(true); };
+  const openEdit = (printer: Printer) => {
+    setEditing(printer);
+    setDraft({ zabbixHostId: printer.zabbixHostId, name: printer.name, hostname: printer.hostname, ipAddress: printer.ipAddress, model: printer.model, manufacturer: printer.manufacturer, group: printer.group, serialNumber: printer.serialNumber || '', sectorId: printer.sectorId || '', status: printer.status });
+    setOpen(true);
+  };
+
+  const savePrinter = async () => {
+    const missing = [draft.zabbixHostId, draft.name, draft.hostname, draft.ipAddress, draft.model, draft.manufacturer, draft.group].some((value) => !value.trim());
+    if (missing) { toast.error('Preencha todos os campos obrigatórios da impressora.'); return; }
+    const payload = { ...draft, serialNumber: draft.serialNumber.trim() || undefined, sectorId: draft.sectorId.trim() || undefined };
     try {
-      setIsLoading(true);
-      if (selectedPrinter) {
-        await printersService.update(selectedPrinter.id, data);
-        toast.success('Impressora atualizada com sucesso');
+      setIsSaving(true);
+      if (editing) {
+        const { zabbixHostId: _zabbixHostId, ...updatePayload } = payload;
+        await printersService.update(editing.id, updatePayload);
+        toast.success('Impressora atualizada com sucesso.');
       } else {
-        await printersService.create(data);
-        toast.success('Impressora criada com sucesso');
+        await printersService.create(payload);
+        toast.success('Impressora criada com sucesso.');
       }
-      setOpenDialog(false);
-      reset();
-      loadPrinters();
-    } catch (error) {
-      toast.error('Erro ao salvar impressora');
-    } finally {
-      setIsLoading(false);
-    }
+      setOpen(false);
+      await loadPrinters();
+    } catch {
+      toast.error('Não foi possível salvar a impressora. Verifique os dados e a conexão com a API.');
+    } finally { setIsSaving(false); }
   };
 
-  // Deletar impressora
-  const handleDelete = async (id: string) => {
-    try {
-      setIsLoading(true);
-      await printersService.delete(id);
-      toast.success('Impressora deletada com sucesso');
-      setDeleteConfirm({ open: false });
-      loadPrinters();
-    } catch (error) {
-      toast.error('Erro ao deletar impressora');
-    } finally {
-      setIsLoading(false);
-    }
+  const removePrinter = async (printer: Printer) => {
+    if (!window.confirm(`Excluir a impressora “${printer.name}”?`)) return;
+    try { await printersService.delete(printer.id); toast.success('Impressora removida com sucesso.'); await loadPrinters(); }
+    catch { toast.error('Não foi possível remover a impressora.'); }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Impressoras</h1>
-          <p className="text-muted-foreground">Gerenciamento de impressoras e suprimentos</p>
-        </div>
-        <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setSelectedPrinter(null); reset(); }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Impressora
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {selectedPrinter ? 'Editar Impressora' : 'Nova Impressora'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                name="name"
-                control={control}
-                label="Nome"
-                placeholder="Ex: Impressora Sala 1"
-                required
-              />
-              <FormField
-                name="model"
-                control={control}
-                label="Modelo"
-                placeholder="Ex: HP LaserJet Pro"
-                required
-              />
-              <FormField
-                name="serialNumber"
-                control={control}
-                label="Número de Série"
-                placeholder="Ex: SN123456"
-                required
-              />
-              <FormField
-                name="ipAddress"
-                control={control}
-                label="Endereço IP"
-                placeholder="Ex: 192.168.1.100"
-                required
-              />
-              <FormField
-                name="sectorId"
-                control={control}
-                label="Setor"
-                type="select"
-                options={[
-                  { label: 'Administrativo', value: '1' },
-                  { label: 'Financeiro', value: '2' },
-                  { label: 'Operacional', value: '3' },
-                ]}
-                required
-              />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isLoading}>
-                  {selectedPrinter ? 'Atualizar' : 'Criar'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+  const statusClass: Record<PrinterStatus, string> = { ONLINE: 'text-emerald-700 dark:text-emerald-300', OFFLINE: 'text-destructive', MAINTENANCE: 'text-amber-700 dark:text-amber-300', ERROR: 'text-destructive' };
 
-      {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total de Impressoras"
-          value={printers.length}
-          icon={<Plus className="w-6 h-6" />}
-          color="blue"
-        />
-        <MetricCard
-          title="Online"
-          value={printers.filter((p: any) => p.status === 'ONLINE').length}
-          color="green"
-        />
-        <MetricCard
-          title="Offline"
-          value={printers.filter((p: any) => p.status === 'OFFLINE').length}
-          color="red"
-        />
-        <MetricCard
-          title="Em Manutenção"
-          value={printers.filter((p: any) => p.status === 'MAINTENANCE').length}
-          color="yellow"
-        />
-      </div>
-
-      {/* Tabela */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Impressoras</CardTitle>
-          <CardDescription>Gerenciar todas as impressoras da empresa</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'name' as const, label: 'Nome' },
-              { key: 'model' as const, label: 'Modelo' },
-              { key: 'ipAddress' as const, label: 'IP' },
-              {
-                key: 'status' as const,
-                label: 'Status',
-                render: (value) => <StatusBadge type="printer" value={value} />,
-              },
-            ]}
-            data={printers}
-            isLoading={isLoading}
-            isEmpty={printers.length === 0}
-            emptyMessage="Nenhuma impressora cadastrada"
-            actions={[
-              {
-                label: 'Editar',
-                onClick: (row: any) => {
-                  setSelectedPrinter(row);
-                  setOpenDialog(true);
-                },
-                variant: 'ghost',
-              },
-              {
-                label: 'Deletar',
-                onClick: (row: any) => {
-                  setDeleteConfirm({ open: true, id: row.id });
-                },
-                variant: 'destructive',
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        open={deleteConfirm.open}
-        title="Deletar Impressora"
-        description="Tem certeza que deseja deletar esta impressora? Esta ação não pode ser desfeita."
-        onConfirm={() => deleteConfirm.id && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm({ open: false })}
-        isLoading={isLoading}
-        confirmText="Deletar"
-        variant="destructive"
-      />
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h1 className="text-3xl font-bold">Impressoras</h1><p className="text-muted-foreground">Cadastre e acompanhe os ativos integrados ao Zabbix.</p></div><Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Nova impressora</Button></div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Card><CardHeader className="pb-2"><CardDescription>Total</CardDescription><CardTitle>{printers.length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Online</CardDescription><CardTitle>{printers.filter((printer) => printer.status === PrinterStatus.ONLINE).length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Offline</CardDescription><CardTitle>{printers.filter((printer) => printer.status === PrinterStatus.OFFLINE).length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Em manutenção</CardDescription><CardTitle>{printers.filter((printer) => printer.status === PrinterStatus.MAINTENANCE).length}</CardTitle></CardHeader></Card></div>
+    <Card><CardHeader><CardTitle>Ativos cadastrados</CardTitle><CardDescription>{visiblePrinters.length} impressora(s) encontrada(s).</CardDescription></CardHeader><CardContent className="space-y-4"><div className="relative max-w-lg"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, hostname, modelo ou IP" /></div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Modelo</TableHead><TableHead>IP</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <TableRow><TableCell colSpan={5} className="text-center">Carregando…</TableCell></TableRow> : null}{!isLoading && visiblePrinters.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhuma impressora encontrada.</TableCell></TableRow> : null}{!isLoading && visiblePrinters.map((printer) => <TableRow key={printer.id}><TableCell className="font-medium">{printer.name}</TableCell><TableCell>{printer.manufacturer} {printer.model}</TableCell><TableCell className="font-mono text-sm">{printer.ipAddress}</TableCell><TableCell className={statusClass[printer.status]}>{printer.status}</TableCell><TableCell className="text-right"><Button size="icon" variant="ghost" aria-label={`Editar ${printer.name}`} onClick={() => openEdit(printer)}><Pencil className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={`Excluir ${printer.name}`} onClick={() => void removePrinter(printer)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{editing ? 'Editar impressora' : 'Nova impressora'}</DialogTitle><DialogDescription>Os campos obrigatórios correspondem ao DTO de impressoras da API.</DialogDescription></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="printer-zabbix">ID do host Zabbix</Label><Input id="printer-zabbix" value={draft.zabbixHostId} disabled={Boolean(editing)} onChange={(event) => changeDraft('zabbixHostId', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-name">Nome</Label><Input id="printer-name" value={draft.name} onChange={(event) => changeDraft('name', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-hostname">Hostname</Label><Input id="printer-hostname" value={draft.hostname} onChange={(event) => changeDraft('hostname', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-ip">Endereço IP</Label><Input id="printer-ip" value={draft.ipAddress} onChange={(event) => changeDraft('ipAddress', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-manufacturer">Fabricante</Label><Input id="printer-manufacturer" value={draft.manufacturer} onChange={(event) => changeDraft('manufacturer', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-model">Modelo</Label><Input id="printer-model" value={draft.model} onChange={(event) => changeDraft('model', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-group">Grupo</Label><Input id="printer-group" value={draft.group} onChange={(event) => changeDraft('group', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-serial">Número de série</Label><Input id="printer-serial" value={draft.serialNumber} onChange={(event) => changeDraft('serialNumber', event.target.value)} /></div><div className="space-y-2"><Label htmlFor="printer-sector">ID do setor</Label><Input id="printer-sector" value={draft.sectorId} onChange={(event) => changeDraft('sectorId', event.target.value)} placeholder="Opcional" /></div><div className="space-y-2"><Label>Status</Label><Select value={draft.status} onValueChange={(value) => changeDraft('status', value as PrinterStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.values(PrinterStatus).map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button disabled={isSaving} onClick={() => void savePrinter()}>{isSaving ? 'Salvando…' : 'Salvar'}</Button></div></DialogContent></Dialog>
+  </div>;
 }

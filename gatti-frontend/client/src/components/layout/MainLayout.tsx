@@ -19,11 +19,11 @@ import {
   LogOut,
   Settings,
   LayoutDashboard,
-  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
   label: string;
@@ -79,7 +79,6 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const isAdmin = useHasRole([UserRole.ADMIN]);
 
   const handleLogout = async () => {
     try {
@@ -174,6 +173,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <h1 className="text-2xl font-bold text-foreground">GATTI</h1>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="text-right">
               <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
               <p className="text-xs text-muted-foreground">{user?.role}</p>

@@ -1,148 +1,38 @@
+/** Página de alertas alinhada ao modelo Alert e aos métodos PATCH da API. */
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { CheckCircle, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { CheckCircle, AlertCircle, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAlerts } from '@/hooks/useQueries';
-import { apiClient } from '@/config/api';
+import { alertsService } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertSeverity } from '@/types';
+
+const severityVariant = (severity: AlertSeverity): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  if (severity === AlertSeverity.CRITICAL) return 'destructive';
+  if (severity === AlertSeverity.WARNING) return 'secondary';
+  return 'outline';
+};
 
 export default function AlertsPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const { data: alerts = [], isLoading, refetch } = useAlerts();
+  const { user } = useAuth();
+  const { data, isLoading, refetch } = useAlerts();
+  const alerts = data?.data ?? [];
+  const [search, setSearch] = useState('');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const filteredAlerts = alerts.filter((alert) => `${alert.message} ${alert.type}`.toLowerCase().includes(search.toLowerCase()));
 
-  const handleAcknowledge = async (id: string) => {
-    try {
-      await apiClient.put(`/alerts/${id}/acknowledge`);
-      toast.success('Alerta reconhecido');
-      refetch();
-    } catch (error) {
-      toast.error('Erro ao reconhecer alerta');
-    }
+  const acknowledge = async (alert: Alert) => {
+    if (!user?.id) { toast.error('Não foi possível identificar o usuário atual.'); return; }
+    try { setPendingId(alert.id); await alertsService.acknowledge(alert.id, user.id); toast.success('Alerta reconhecido.'); await refetch(); } catch { toast.error('Não foi possível reconhecer o alerta.'); } finally { setPendingId(null); }
+  };
+  const resolve = async (alert: Alert) => {
+    try { setPendingId(alert.id); await alertsService.resolve(alert.id); toast.success('Alerta resolvido.'); await refetch(); } catch { toast.error('Não foi possível resolver o alerta.'); } finally { setPendingId(null); }
   };
 
-  const handleResolve = async (id: string) => {
-    try {
-      await apiClient.put(`/alerts/${id}/resolve`);
-      toast.success('Alerta resolvido');
-      refetch();
-    } catch (error) {
-      toast.error('Erro ao resolver alerta');
-    }
-  };
-
-  const filteredAlerts = (Array.isArray(alerts) ? alerts : alerts?.data || []).filter((alert: any) =>
-    alert.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    alert.message?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'destructive';
-      case 'high': return 'secondary';
-      case 'medium': return 'default';
-      default: return 'outline';
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Alertas</h1>
-          <p className="text-muted-foreground">Monitore alertas do sistema</p>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Alertas Ativos</CardTitle>
-          <CardDescription>Total: {filteredAlerts.length} alertas</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Buscar alertas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <Button variant="outline">
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Severidade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredAlerts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">
-                      Nenhum alerta encontrado
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredAlerts.map((alert: any) => (
-                    <TableRow key={alert.id}>
-                      <TableCell className="font-medium">{alert.title}</TableCell>
-                      <TableCell>
-                        <Badge variant={getSeverityColor(alert.severity)}>
-                          {alert.severity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={alert.resolved ? 'outline' : 'default'}>
-                          {alert.resolved ? 'Resolvido' : 'Ativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(alert.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="flex gap-2">
-                        {!alert.acknowledged && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAcknowledge(alert.id)}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Reconhecer
-                          </Button>
-                        )}
-                        {!alert.resolved && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleResolve(alert.id)}
-                          >
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            Resolver
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <div className="space-y-6"><div><h1 className="text-3xl font-bold">Alertas</h1><p className="text-muted-foreground">Acompanhe e trate alertas operacionais do sistema.</p></div><Card><CardHeader><CardTitle>Alertas do sistema</CardTitle><CardDescription>{filteredAlerts.length} alerta(s) encontrado(s).</CardDescription></CardHeader><CardContent className="space-y-4"><div className="relative max-w-lg"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por mensagem ou tipo" /></div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Mensagem</TableHead><TableHead>Severidade</TableHead><TableHead>Status</TableHead><TableHead>Criado em</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <TableRow><TableCell colSpan={5} className="text-center">Carregando…</TableCell></TableRow> : null}{!isLoading && filteredAlerts.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum alerta encontrado.</TableCell></TableRow> : null}{!isLoading && filteredAlerts.map((alert) => { const isResolved = Boolean(alert.resolvedAt) || !alert.isActive; const isAcknowledged = Boolean(alert.acknowledgedAt); return <TableRow key={alert.id}><TableCell className="font-medium">{alert.message}</TableCell><TableCell><Badge variant={severityVariant(alert.severity)}>{alert.severity}</Badge></TableCell><TableCell><Badge variant={isResolved ? 'outline' : 'default'}>{isResolved ? 'Resolvido' : 'Ativo'}</Badge></TableCell><TableCell>{new Date(alert.createdAt).toLocaleString('pt-BR')}</TableCell><TableCell className="space-x-2 text-right">{!isAcknowledged && !isResolved ? <Button size="sm" variant="outline" disabled={pendingId === alert.id} onClick={() => void acknowledge(alert)}><CheckCircle className="mr-1 h-4 w-4" />Reconhecer</Button> : null}{!isResolved ? <Button size="sm" variant="outline" disabled={pendingId === alert.id} onClick={() => void resolve(alert)}>Resolver</Button> : null}</TableCell></TableRow>; })}</TableBody></Table></div></CardContent></Card></div>;
 }

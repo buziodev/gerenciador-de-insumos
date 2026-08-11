@@ -1,4 +1,7 @@
+/** Página de relatórios alinhada ao recurso Report disponível na API. */
 import { useState } from 'react';
+import { Download, Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,170 +9,30 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { Plus, Download, Search } from 'lucide-react';
 import { useReports } from '@/hooks/useQueries';
-import { apiClient } from '@/config/api';
+import { reportsService } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { ReportType } from '@/types';
+
+const REPORT_LABELS: Record<ReportType, string> = {
+  [ReportType.MONTHLY_CONSUMPTION]: 'Consumo mensal', [ReportType.ANNUAL_CONSUMPTION]: 'Consumo anual', [ReportType.COSTS]: 'Custos', [ReportType.TONER_CHANGES]: 'Trocas de toner', [ReportType.STOCK_INVENTORY]: 'Inventário de estoque', [ReportType.PRINTER_PERFORMANCE]: 'Performance de impressoras',
+};
 
 export default function ReportsPage() {
+  const { user } = useAuth();
+  const { data, isLoading, refetch } = useReports();
+  const reports = data?.data ?? [];
   const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [reportType, setReportType] = useState('consumption');
-  const [format, setFormat] = useState('pdf');
+  const [search, setSearch] = useState('');
+  const [type, setType] = useState<ReportType>(ReportType.MONTHLY_CONSUMPTION);
+  const [title, setTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const visibleReports = reports.filter((report) => `${report.title} ${report.type}`.toLowerCase().includes(search.toLowerCase()));
 
-  const { data: reports = [], isLoading, refetch } = useReports();
-
-  const handleGenerateReport = async () => {
-    try {
-      const response = await apiClient.post(`/reports/generate`, {
-        type: reportType,
-        format,
-      }, {
-        responseType: 'blob',
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `relatorio-${reportType}.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      
-      toast.success('Relatório gerado com sucesso');
-      setOpen(false);
-    } catch (error) {
-      toast.error('Erro ao gerar relatório');
-    }
+  const createReport = async () => {
+    if (!user?.id || !title.trim()) { toast.error('Informe um título e faça login novamente antes de solicitar o relatório.'); return; }
+    try { setIsSaving(true); await reportsService.create({ type, title: title.trim(), generatedBy: user.id, filters: {} }); toast.success('Solicitação de relatório registrada.'); setOpen(false); setTitle(''); await refetch(); } catch { toast.error('Não foi possível registrar a solicitação de relatório.'); } finally { setIsSaving(false); }
   };
 
-  const filteredReports = (Array.isArray(reports) ? reports : reports?.data || []).filter((report: any) =>
-    report.title?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Relatórios</h1>
-          <p className="text-muted-foreground">Gere e visualize relatórios do sistema</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Relatório
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Relatórios Disponíveis</CardTitle>
-          <CardDescription>Total: {filteredReports.length} relatórios</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Buscar relatórios..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <Button variant="outline">
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      Carregando...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredReports.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      Nenhum relatório encontrado
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredReports.map((report: any) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium">{report.title}</TableCell>
-                      <TableCell>{report.type}</TableCell>
-                      <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline">
-                          <Download className="w-4 h-4 mr-1" />
-                          Download
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Gerar Novo Relatório</DialogTitle>
-            <DialogDescription>Selecione o tipo e formato do relatório</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="type">Tipo de Relatório</Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Selecione um tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="consumption">Consumo de Suprimentos</SelectItem>
-                  <SelectItem value="inventory">Inventário</SelectItem>
-                  <SelectItem value="costs">Custos</SelectItem>
-                  <SelectItem value="maintenance">Manutenção</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="format">Formato</Label>
-              <Select value={format} onValueChange={setFormat}>
-                <SelectTrigger id="format">
-                  <SelectValue placeholder="Selecione um formato" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="xlsx">Excel</SelectItem>
-                  <SelectItem value="csv">CSV</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleGenerateReport}>
-                Gerar Relatório
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+  return <div className="space-y-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h1 className="text-3xl font-bold">Relatórios</h1><p className="text-muted-foreground">Solicite relatórios e acesse os arquivos finalizados.</p></div><Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo relatório</Button></div><Card><CardHeader><CardTitle>Relatórios disponíveis</CardTitle><CardDescription>{visibleReports.length} relatório(s) encontrado(s).</CardDescription></CardHeader><CardContent className="space-y-4"><div className="relative max-w-lg"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por título ou tipo" /></div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Título</TableHead><TableHead>Tipo</TableHead><TableHead>Gerado em</TableHead><TableHead className="text-right">Arquivo</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <TableRow><TableCell colSpan={4} className="text-center">Carregando…</TableCell></TableRow> : null}{!isLoading && visibleReports.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Nenhum relatório encontrado.</TableCell></TableRow> : null}{!isLoading && visibleReports.map((report) => <TableRow key={report.id}><TableCell className="font-medium">{report.title}</TableCell><TableCell>{REPORT_LABELS[report.type]}</TableCell><TableCell>{new Date(report.generatedAt || report.createdAt).toLocaleString('pt-BR')}</TableCell><TableCell className="text-right">{report.fileUrl ? <Button asChild size="sm" variant="outline"><a href={report.fileUrl} target="_blank" rel="noreferrer"><Download className="mr-1 h-4 w-4" />Baixar</a></Button> : <span className="text-sm text-muted-foreground">Em processamento</span>}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Solicitar relatório</DialogTitle><DialogDescription>A API registra a solicitação; o arquivo só fica disponível quando `fileUrl` for preenchido pelo processamento do backend.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="report-title">Título</Label><Input id="report-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Inventário — junho de 2026" /></div><div className="space-y-2"><Label>Tipo</Label><Select value={type} onValueChange={(value) => setType(value as ReportType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(REPORT_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></div><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button disabled={isSaving} onClick={() => void createReport()}>{isSaving ? 'Solicitando…' : 'Solicitar'}</Button></div></DialogContent></Dialog></div>;
 }
