@@ -12,4 +12,4 @@
 - [x] Testar dashboard, estados vazios, tema e comportamento de interface.
 - [x] Investigar erros de console, respostas HTTP inválidas e falhas de consistência.
 - [x] Executar regressão de builds, schema e suíte de integração.
-- [ ] Publicar correções verificadas e relatório QA no GitHub.
+- [x] Publicar correções verificadas e relatório QA no GitHub.

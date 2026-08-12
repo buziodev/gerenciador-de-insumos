@@ -53,3 +53,7 @@ O console do navegador não apresentou erros de aplicação durante os cenários
 ## Regressão final
 
 Após as correções de RBAC e a rodada funcional, o frontend concluiu `pnpm check` e `pnpm build` com sucesso. O backend concluiu `npm run build` com sucesso. A base PostgreSQL descartável `gatti_qa` foi reinicializada com as migrations e o administrador de QA, e a API foi reiniciada na porta 3001. A suíte `npm run test:integration` foi executada contra essa API limpa com **61 verificações aprovadas e 0 falhas**.
+
+## Versionamento
+
+As correções de RBAC e as evidências desta rodada foram publicadas no repositório `buziodev/gerenciador-de-insumos`, branch `main`, pelo commit `cd53f6d` — `fix(qa): proteger rotas e controles de escrita por papel RBAC` — com autoria de **Kauã B e J**. Este checklist atualizado foi versionado na sequência para manter o registro de publicação consistente.
