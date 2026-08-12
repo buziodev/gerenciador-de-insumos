@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
@@ -9,16 +9,14 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    // Verificar se email já existe
     const existingUser = await this.prisma.user.findFirst({
-      where: { email: createUserDto.email, deletedAt: null }
+      where: { email: createUserDto.email, deletedAt: null },
     });
 
     if (existingUser) {
       throw new ConflictException(`Email ${createUserDto.email} já está cadastrado`);
     }
 
-    // Hash da senha
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
     return this.prisma.user.create({
@@ -32,7 +30,6 @@ export class UsersService {
         lastName: true,
         email: true,
         role: true,
-        sectorId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -41,7 +38,6 @@ export class UsersService {
 
   async findAll(query: ListUsersQueryDto) {
     const { skip = 0, take = 10, role, search } = query;
-
     const where: any = { deletedAt: null };
 
     if (role) {
@@ -67,7 +63,6 @@ export class UsersService {
           lastName: true,
           email: true,
           role: true,
-          sectorId: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -88,15 +83,14 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         email: true,
         role: true,
-        sectorId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -112,7 +106,6 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto) {
     const user = await this.findOne(id);
 
-    // Se email está sendo atualizado, verificar duplicação
     if (updateUserDto.email && updateUserDto.email !== user.email) {
       const existingEmail = await this.prisma.user.findFirst({
         where: {
@@ -127,7 +120,6 @@ export class UsersService {
       }
     }
 
-    // Se senha está sendo atualizada, fazer hash
     const data: any = { ...updateUserDto };
     if (updateUserDto.password) {
       data.password = await bcrypt.hash(updateUserDto.password, 10);
@@ -142,7 +134,6 @@ export class UsersService {
         lastName: true,
         email: true,
         role: true,
-        sectorId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -150,12 +141,11 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    const user = await this.findOne(id);
+    await this.findOne(id);
 
-    // Soft delete
     return this.prisma.user.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), isActive: false },
       select: {
         id: true,
         firstName: true,
@@ -166,24 +156,20 @@ export class UsersService {
   }
 
   async changePassword(id: string, changePasswordDto: ChangePasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
     });
 
     if (!user) {
       throw new NotFoundException(`Usuário com ID ${id} não encontrado`);
     }
 
-    // Verificar senha atual
     const isPasswordValid = await bcrypt.compare(changePasswordDto.currentPassword, user.password);
-
     if (!isPasswordValid) {
       throw new BadRequestException('Senha atual inválida');
     }
 
-    // Hash da nova senha
     const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
-
     return this.prisma.user.update({
       where: { id },
       data: { password: hashedPassword },
@@ -197,7 +183,7 @@ export class UsersService {
   }
 
   async updateRole(id: string, role: UserRole) {
-    const user = await this.findOne(id);
+    await this.findOne(id);
 
     return this.prisma.user.update({
       where: { id },

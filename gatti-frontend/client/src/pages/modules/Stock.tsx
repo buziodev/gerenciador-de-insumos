@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useStockMovements, useSupplies } from '@/hooks/useQueries';
 import { stockService } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
 import { MovementType } from '@/types';
 
 const MOVEMENT_LABELS: Record<MovementType, string> = {
@@ -19,7 +18,6 @@ const MOVEMENT_LABELS: Record<MovementType, string> = {
 };
 
 export default function StockPage() {
-  const { user } = useAuth();
   const { data: movementResponse, isLoading, refetch } = useStockMovements();
   const { data: supplyResponse, isLoading: isLoadingSupplies } = useSupplies();
   const movements = movementResponse?.data ?? [];
@@ -37,13 +35,13 @@ export default function StockPage() {
   const resetDialog = () => { setSupplyId(''); setType(MovementType.ENTRY); setQuantity(''); setReason(''); };
   const saveMovement = async () => {
     const parsedQuantity = Number(quantity);
-    if (!user?.id || !supplyId || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+    if (!supplyId || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
       toast.error('Selecione um suprimento e informe uma quantidade inteira positiva.');
       return;
     }
     try {
       setIsSaving(true);
-      await stockService.createMovement({ supplyId, type, quantity: parsedQuantity, reason: reason.trim() || undefined, createdBy: user.id });
+      await stockService.createMovement({ supplyId, type, quantity: parsedQuantity, reason: reason.trim() || undefined });
       toast.success('Movimentação registrada com sucesso.');
       setOpen(false);
       resetDialog();

@@ -19,13 +19,22 @@ export class CreateSectorDto {
   description?: string;
 
   @ApiProperty({
-    example: 'ADM',
-    description: 'Código do setor',
+    example: 'CC-ADM-001',
+    description: 'Centro de custo do setor',
     required: false,
   })
   @IsOptional()
   @IsString()
-  code?: string;
+  costCenter?: string;
+
+  @ApiProperty({
+    example: 'Responsável pelo Administrativo',
+    description: 'Responsável pelo setor',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  manager?: string;
 }
 
 export class UpdateSectorDto extends PartialType(CreateSectorDto) {}

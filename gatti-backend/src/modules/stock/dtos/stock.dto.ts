@@ -59,12 +59,6 @@ export class CreateStockMovementDto {
   @IsString()
   toLocation?: string;
 
-  @ApiProperty({
-    example: 'user-123',
-    description: 'ID do usuário que criou o movimento',
-  })
-  @IsString()
-  createdBy!: string;
 }
 
 export class ListMovementsQueryDto {

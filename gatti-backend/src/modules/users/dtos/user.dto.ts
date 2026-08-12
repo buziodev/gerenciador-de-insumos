@@ -46,14 +46,6 @@ export class CreateUserDto {
   @IsEnum(UserRoleEnum)
   role!: UserRoleEnum;
 
-  @ApiProperty({
-    example: 'sector-1',
-    description: 'ID do setor',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  sectorId?: string;
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {}

@@ -94,7 +94,6 @@ export const CreateStockMovementSchema = z.object({
   reason: z.string().max(500, 'Motivo muito longo').optional(),
   fromLocation: z.string().optional(),
   toLocation: z.string().optional(),
-  createdBy: z.string().min(1, 'Usuário é obrigatório'),
 });
 
 export type CreateStockMovementFormData = z.infer<typeof CreateStockMovementSchema>;
@@ -129,12 +128,6 @@ export const CreateAlertSchema = z.object({
 
 export type CreateAlertFormData = z.infer<typeof CreateAlertSchema>;
 
-export const AcknowledgeAlertSchema = z.object({
-  acknowledgedBy: z.string().min(1, 'Usuário é obrigatório'),
-});
-
-export type AcknowledgeAlertFormData = z.infer<typeof AcknowledgeAlertSchema>;
-
 // ============================================================================
 // MANUTENÇÃO
 // ============================================================================
@@ -158,7 +151,6 @@ export const CreateReportSchema = z.object({
   type: z.string().min(1, 'Tipo de relatório é obrigatório'),
   title: z.string().min(1, 'Título é obrigatório').max(255, 'Título muito longo'),
   description: z.string().max(1000, 'Descrição muito longa').optional(),
-  generatedBy: z.string().min(1, 'Usuário é obrigatório'),
   filters: z.record(z.string(), z.any()).optional(),
 });
 

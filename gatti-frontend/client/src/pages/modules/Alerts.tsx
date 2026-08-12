@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAlerts } from '@/hooks/useQueries';
 import { alertsService } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertSeverity } from '@/types';
 
 const severityVariant = (severity: AlertSeverity): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -19,7 +18,6 @@ const severityVariant = (severity: AlertSeverity): 'default' | 'secondary' | 'de
 };
 
 export default function AlertsPage() {
-  const { user } = useAuth();
   const { data, isLoading, refetch } = useAlerts();
   const alerts = data?.data ?? [];
   const [search, setSearch] = useState('');
@@ -27,8 +25,7 @@ export default function AlertsPage() {
   const filteredAlerts = alerts.filter((alert) => `${alert.message} ${alert.type}`.toLowerCase().includes(search.toLowerCase()));
 
   const acknowledge = async (alert: Alert) => {
-    if (!user?.id) { toast.error('Não foi possível identificar o usuário atual.'); return; }
-    try { setPendingId(alert.id); await alertsService.acknowledge(alert.id, user.id); toast.success('Alerta reconhecido.'); await refetch(); } catch { toast.error('Não foi possível reconhecer o alerta.'); } finally { setPendingId(null); }
+    try { setPendingId(alert.id); await alertsService.acknowledge(alert.id); toast.success('Alerta reconhecido.'); await refetch(); } catch { toast.error('Não foi possível reconhecer o alerta.'); } finally { setPendingId(null); }
   };
   const resolve = async (alert: Alert) => {
     try { setPendingId(alert.id); await alertsService.resolve(alert.id); toast.success('Alerta resolvido.'); await refetch(); } catch { toast.error('Não foi possível resolver o alerta.'); } finally { setPendingId(null); }

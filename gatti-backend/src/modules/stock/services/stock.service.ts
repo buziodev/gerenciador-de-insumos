@@ -6,7 +6,7 @@ import { CreateStockMovementDto, ListMovementsQueryDto } from '../dtos/stock.dto
 export class StockService {
   constructor(private prisma: PrismaService) {}
 
-  async createMovement(createMovementDto: CreateStockMovementDto) {
+  async createMovement(createMovementDto: CreateStockMovementDto & { createdBy: string }) {
     // Validar quantidade
     if (createMovementDto.quantity <= 0) {
       throw new BadRequestException('Quantidade deve ser maior que zero');

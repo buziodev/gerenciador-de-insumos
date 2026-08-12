@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
 import { GenerateReportDto, ListReportsQueryDto } from '../dtos/report.dto';
 
@@ -6,7 +7,7 @@ import { GenerateReportDto, ListReportsQueryDto } from '../dtos/report.dto';
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async generateReport(generateReportDto: GenerateReportDto) {
+  async generateReport(generateReportDto: GenerateReportDto, generatedBy: string) {
     // Aqui será implementada a lógica de geração de relatórios
     // Por enquanto, apenas registramos a solicitação
     const report = await this.prisma.report.create({
@@ -14,7 +15,7 @@ export class ReportsService {
         type: generateReportDto.type,
         title: generateReportDto.title,
         description: generateReportDto.description,
-        generatedBy: generateReportDto.generatedBy,
+        generatedBy,
         filters: generateReportDto.filters || {},
       },
     });
@@ -65,29 +66,32 @@ export class ReportsService {
   }
 
   async getConsumptionReport(startDate: Date, endDate: Date) {
+    const period = this.normalizePeriod(startDate, endDate);
     // Implementar lógica de consumo
     return {
       type: 'MONTHLY_CONSUMPTION',
-      period: { startDate, endDate },
+      period,
       data: [],
     };
   }
 
   async getCostsReport(startDate: Date, endDate: Date) {
+    const period = this.normalizePeriod(startDate, endDate);
     // Implementar lógica de custos
     return {
       type: 'COSTS',
-      period: { startDate, endDate },
+      period,
       data: [],
     };
   }
 
   async getTonerChangesReport(startDate: Date, endDate: Date) {
+    const period = this.normalizePeriod(startDate, endDate);
     const changes = await this.prisma.tonerChange.findMany({
       where: {
         detectedAt: {
-          gte: startDate,
-          lte: endDate,
+          gte: period.startDate,
+          lte: period.endDate,
         },
       },
       include: {
@@ -98,7 +102,7 @@ export class ReportsService {
 
     return {
       type: 'TONER_CHANGES',
-      period: { startDate, endDate },
+      period,
       total: changes.length,
       data: changes,
     };
@@ -115,5 +119,21 @@ export class ReportsService {
       generatedAt: new Date(),
       data: stock,
     };
+  }
+
+  private normalizePeriod(startDate?: Date, endDate?: Date) {
+    const now = new Date();
+    const hasValidStart = startDate && !Number.isNaN(startDate.getTime());
+    const hasValidEnd = endDate && !Number.isNaN(endDate.getTime());
+    const resolvedEnd = hasValidEnd ? endDate : now;
+    const resolvedStart = hasValidStart
+      ? startDate
+      : new Date(resolvedEnd.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    if (resolvedStart > resolvedEnd) {
+      throw new BadRequestException('A data inicial não pode ser posterior à data final');
+    }
+
+    return { startDate: resolvedStart, endDate: resolvedEnd };
   }
 }

@@ -1,69 +1,96 @@
 # Validação técnica — GATTI Supply Management System
 
-**Data:** 11 de agosto de 2026  
-**Escopo:** cópia de trabalho em `gatti-backend` e `gatti-frontend`.
+**Data:** 12 de agosto de 2026
+**Escopo:** `gatti-backend` e `gatti-frontend` na cópia de trabalho versionável.
 
-## Resultado
+## Resultado de validação
 
-O código foi compilado e validado estaticamente, mas **não deve ser classificado como pronto para produção**. Não havia PostgreSQL, Redis nem Docker disponíveis no ambiente para aplicar migrações, iniciar todos os serviços ou executar fluxos autenticados de ponta a ponta.
+O sistema foi executado contra um **PostgreSQL real e descartável**, com a migração inicial aplicada e um administrador provisionado por variáveis de ambiente. A API NestJS foi inicializada e uma suíte de integração HTTP percorreu autenticação, RBAC, CRUDs, estoque, relatórios, alertas, health checks e exclusões lógicas.
 
 | Área | Evidência executada | Resultado |
 |---|---|---|
 | Backend NestJS | `npm run build` | Aprovado |
-| Schema Prisma | `npx prisma validate` com URL PostgreSQL de formato válido | Aprovado |
-| Cliente Prisma | `npx prisma generate` | Aprovado |
+| Schema Prisma | `npx prisma validate` | Aprovado |
+| Migração inicial | `npx prisma migrate deploy` em PostgreSQL limpo | Aprovado |
+| Seed parametrizado | `npm run prisma:seed` com credenciais em variáveis de ambiente | Aprovado |
+| API e regras de negócio | `npm run test:integration` contra API e banco reais | **61 asserções aprovadas; 0 falhas** |
 | Frontend TypeScript | `pnpm check` | Aprovado |
-| Build do frontend | `pnpm build` | Aprovado; há aviso de bundle JavaScript acima de 500 kB |
-| Roteamento sem sessão | `/` e `/printers` no navegador | Ambos levam a `/auth/login` |
-| Fluxos com banco | Login, CRUD e movimentações reais | Não executados: dependem de PostgreSQL e de usuário provisionado |
-| Compose/Docker | `docker compose config`, build e subida | Não executados: Docker indisponível no ambiente |
+| Build do frontend | `pnpm build` | Aprovado; persiste aviso de bundle acima de 500 kB |
+| Login no navegador | Login administrativo via frontend e proxy Vite | Aprovado |
+| Módulos no navegador | Dashboard, impressoras, suprimentos, estoque, alertas, relatórios e administração | Aprovado nos fluxos exercitados |
+| Docker/Compose | Build e subida dos contêineres | Não executados; Docker não está disponível neste ambiente |
 
-## Correções verificadas
+> O resultado comprova os fluxos listados nesta validação. Ele **não substitui** uma homologação de contêineres, uma configuração Zabbix real, testes de carga ou uma suíte formal de cobertura unitária.
 
-As correções de backend preservam o modelo atual e evitam alterações especulativas. A criação de suprimento e o respectivo registro inicial de estoque passaram a ocorrer em uma única transação. A exclusão lógica de um suprimento também oculta o estoque associado. As saídas, transferências e perdas usam atualização condicional de quantidade para impedir saldo negativo em concorrência, e a movimentação recebe `createdBy` exclusivamente do usuário autenticado.
+## Cobertura da suíte de integração
 
-As consultas de suprimento e estoque passam a respeitar `deletedAt`. A atualização dos níveis de estoque valida valores negativos e a relação entre mínimo e máximo. A rota de prontidão consulta o banco antes de responder com sucesso, por isso o health check do backend não anuncia disponibilidade quando a dependência principal está indisponível.
+A suíte `gatti-backend/scripts/integration-smoke.mjs` foi adicionada como `npm run test:integration`. Ela usa um administrador criado pelo seed e aplica as operações em PostgreSQL, sem dados de demonstração permanentes no código.
 
-No frontend, as rotas dos módulos são mantidas sob a proteção existente. A raiz usa redirecionamento declarativo, sem mutar `window.location` durante a renderização. O alternador de tema foi integrado ao layout e as credenciais fictícias foram removidas da tela de login; nenhum usuário inicial foi inventado.
+| Domínio | Casos exercitados |
+|---|---|
+| Autenticação | Rota protegida sem token, login inválido, login válido, refresh, logout e invalidação de refresh token |
+| RBAC | Bloqueio de `VIEWER` em setor, suprimento e sincronização Zabbix |
+| Usuários | Criar, listar, buscar, atualizar, alterar senha, alterar papel, soft delete e leitura posterior retornando 404 |
+| Setores | Criar, listar, buscar, atualizar, soft delete e leitura posterior retornando 404 |
+| Impressoras | Criar, listar, buscar, atualizar, métricas, soft delete e leitura posterior retornando 404 |
+| Suprimentos | Criar com estoque inicial, listar, buscar, atualizar, consultar estoque e soft delete |
+| Estoque | Configurar níveis, rejeitar mínimo/máximo inválidos, entrada, saída, rejeição de saldo insuficiente e listagens |
+| Alertas | Criar, listar, listar ativos/críticos, consultar por impressora, reconhecer e resolver |
+| Relatórios | Registrar solicitação, listar, consultar e obter resumos de consumo, custos, toner e inventário |
+| Saúde | Aplicação inicializada com PostgreSQL e rota de prontidão vinculada ao banco |
 
-## Conteinerização preparada
+## Defeitos reproduzidos e correções aplicadas
 
-Os Dockerfiles foram ajustados para os lockfiles e o tipo real de cada aplicação: `npm ci` e geração Prisma no NestJS; `pnpm build` e Nginx para o artefato Vite. O Compose é executado a partir de `gatti-backend`, usa o frontend irmão como contexto de build e exige `POSTGRES_PASSWORD`, `JWT_SECRET` e `JWT_REFRESH_SECRET` do ambiente. Não há senhas, segredo JWT ou credencial Zabbix operacional fixados no arquivo.
-
-> O endpoint de disponibilidade usado pelo Compose é `GET /api/v1/health/ready`. Ele depende do banco e deve retornar erro enquanto o PostgreSQL não estiver pronto.
-
-## Pendências objetivas de homologação
-
-| Pendência | Motivo | Ação necessária |
+| Defeito confirmado | Correção aplicada | Regressão |
 |---|---|---|
-| Migração inicial versionada | Não existe diretório `prisma/migrations` no repositório recuperado | Em um PostgreSQL novo de homologação, executar `npx prisma migrate dev --name init` e versionar os arquivos criados |
-| Usuário inicial | Não existe seed script nem conta criada | Provisionar o primeiro administrador por procedimento seguro e validá-lo contra o endpoint de autenticação |
-| Testes automatizados | O script `npm test` atual encerra com erro e não há suíte configurada | Criar testes unitários e de integração para autenticação, RBAC, estoque e soft delete |
-| Teste completo de containers | Docker não está instalado neste ambiente | Executar `docker compose build` e `docker compose up` em ambiente com Docker/Compose |
-| Integração Zabbix | URL, credenciais e mapeamento de itens não foram fornecidos | Configurar apenas após receber os parâmetros de ambiente e validar uma impressora de homologação |
-| Atualizações em tempo real | WebSocket não foi implementado | O monitoramento atual permanece por polling; confirmar o requisito operacional antes de adicionar canal em tempo real |
-| Otimização do bundle | O build alerta para chunk acima de 500 kB | Medir uso real e aplicar imports dinâmicos antes de uma publicação pública, se necessário |
+| Refresh token emitido no mesmo segundo podia repetir valor e violar unicidade de sessão | Inclusão de `jti` único e invalidação da sessão anterior antes de gerar a nova | Refresh HTTP aprovado |
+| Módulos Nest que usam Prisma não importavam o provider | Importação de `PrismaModule` em usuários, setores e saúde | Bootstrap Nest aprovado |
+| CRUD de usuários tentava selecionar o campo inexistente `sectorId` | DTO e serviço alinhados ao modelo Prisma; leituras respeitam soft delete | CRUD de usuários aprovado |
+| Setores usavam `code` e relação `users`, ausentes do schema | Contrato alinhado a `costCenter`, `manager` e relação com impressoras | CRUD de setores aprovado |
+| Busca de impressoras aplicava `contains` em coluna PostgreSQL `inet` | Busca textual permanece em nome/hostname e IP aceita comparação exata válida | Listagem HTTP e frontend aprovadas |
+| Relatórios sem período construíam `Invalid Date` | Janela padrão de 30 dias e validação de intervalo | Três resumos aprovados |
+| Paginação recebia `skip` e `take` como texto e falhava no Prisma | Conversão implícita na `ValidationPipe` | Frontend passou a carregar listas com `take=100` |
+| Autorias podiam ser enviadas pelo cliente | Estoque, reconhecimento de alerta e relatório derivam autoria do JWT; contratos do frontend foram atualizados | Asserções de autoria aprovadas |
+| Administração era uma tela de placeholder | CRUD real de usuários e setores com tabelas, formulários, edição, troca de papel e exclusão | Criação e edição validadas no navegador; exclusões cobertas pela suíte HTTP |
+| Dashboard exibia indicadores e listas simulados | Indicadores e estados vazios agora provêm das APIs de impressoras, alertas e estoque crítico | Validado no navegador |
 
-## Procedimento mínimo para homologação
+## Fluxos de interface observados
 
-Em uma máquina com PostgreSQL, Redis, Node.js e Docker disponíveis, copie o modelo de ambiente e defina segredos fortes. Em um banco novo e descartável, gere e aplique a primeira migração antes de iniciar o backend. Não use `reset` ou comandos de criação de migração contra uma base com dados sem revisão prévia.
+O navegador confirmou o redirecionamento sem sessão para `/auth/login`, o login administrativo e a renderização autenticada das rotas de módulos. As páginas de impressoras e suprimentos carregaram corretamente a paginação; estoque e alertas mostraram registros criados pela suíte; relatórios exibiram a solicitação persistida.
+
+A administração deixou de exibir o placeholder anterior. Foi criado pela interface o usuário temporário `usuario.ui@gatti.test`, que teve seu papel atualizado de **Visualizador** para **Gerente**. Também foi criado e atualizado o setor temporário **Operações de Teste**. A tentativa de confirmação do soft delete de setor foi interrompida pelo diálogo nativo do navegador; essa mesma operação foi concluída e validada na suíte HTTP.
+
+As notas detalhadas de navegação e evidências estão em [`TEST_NOTES.md`](./TEST_NOTES.md).
+
+## Limitações objetivas para homologação
+
+| Pendência | Situação atual | Ação necessária |
+|---|---|---|
+| Docker/Compose | Arquivos foram revisados, mas não executados localmente | Rodar `docker compose build` e `docker compose up` em ambiente com Docker/Compose |
+| Redis e filas | Não foram exercitados como dependência operacional completa | Homologar filas e jobs se forem habilitados no fluxo de produção |
+| Zabbix | Sem URL, credenciais e mapeamento de itens fornecidos | Configurar segredos e validar sincronização com host de homologação |
+| WebSocket | Não implementado; alertas usam polling | Confirmar necessidade operacional antes de introduzir canal em tempo real |
+| Cobertura automatizada formal | Há suíte de integração executável, mas não há Jest/Vitest com cobertura percentual | Adicionar testes unitários e relatório de cobertura no pipeline CI |
+| Bundle do frontend | `pnpm build` alerta para chunk acima de 500 kB | Medir carregamento real e aplicar code splitting se necessário |
+
+## Procedimento reproduzível de integração
+
+Em um PostgreSQL descartável, crie um banco e um usuário exclusivos. Depois, aplique a migração, crie o administrador por ambiente, inicie a API e execute a suíte. Os valores de exemplo abaixo devem ser substituídos por segredos em qualquer ambiente não temporário.
 
 ```bash
 cd gatti-backend
-cp .env.example .env
-# Preencha DATABASE_URL, JWT_SECRET e JWT_REFRESH_SECRET no .env.
-npx prisma migrate dev --name init
+export DATABASE_URL='postgresql://USUARIO:SENHA@HOST:5432/gatti_test'
+export INITIAL_ADMIN_EMAIL='admin@example.test'
+export INITIAL_ADMIN_PASSWORD='senha-temporaria-forte'
+export INITIAL_ADMIN_FIRST_NAME='Admin'
+export INITIAL_ADMIN_LAST_NAME='Homologação'
+
+npx prisma migrate deploy
+npm run prisma:seed
 npm run build
-npm run start:dev
+
+# Em outro terminal, inicie a API com JWT_SECRET e JWT_REFRESH_SECRET definidos.
+npm run test:integration
 ```
 
-Depois de versionar a migração, a composição pode ser validada a partir de `gatti-backend`:
-
-```bash
-POSTGRES_PASSWORD='senha-do-banco' \
-JWT_SECRET='segredo-de-acesso' \
-JWT_REFRESH_SECRET='segredo-de-refresh' \
-docker compose up --build
-```
-
-Os testes de aceitação devem incluir login de administrador provisionado, bloqueio de papéis sem permissão, criação e exclusão lógica de suprimento, entradas e saídas concorrentes de estoque, consulta de alertas e leitura de `GET /api/v1/health/ready` com o banco disponível e indisponível.
+Para contêineres, a validação deve ser executada a partir de `gatti-backend` com `POSTGRES_PASSWORD`, `JWT_SECRET` e `JWT_REFRESH_SECRET` definidos no ambiente. Não inclua esses valores em arquivos versionados.

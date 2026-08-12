@@ -209,11 +209,11 @@ export function useAlert(id: string, options?: UseQueryOptions<Alert>) {
   });
 }
 
-export function useAcknowledgeAlert(id: string, acknowledgedBy: string, options?: UseMutationOptions<any, Error, void>) {
+export function useAcknowledgeAlert(id: string, options?: UseMutationOptions<any, Error, void>) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => alertsService.acknowledge(id, acknowledgedBy),
+    mutationFn: () => alertsService.acknowledge(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
       queryClient.invalidateQueries({ queryKey: ['alerts', id] });

@@ -12,10 +12,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AlertsService } from '../services/alerts.service';
-import { CreateAlertDto, ListAlertsQueryDto, AcknowledgeAlertDto } from '../dtos/alert.dto';
+import { CreateAlertDto, ListAlertsQueryDto } from '../dtos/alert.dto';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@modules/auth/guards/roles.guard';
 import { Roles } from '@modules/auth/decorators/roles.decorator';
+import { Request } from '@nestjs/common';
 
 @ApiTags('Alerts')
 @Controller('alerts')
@@ -65,9 +66,9 @@ export class AlertsController {
   @ApiOperation({ summary: 'Reconhecer um alerta' })
   async acknowledge(
     @Param('id') id: string,
-    @Body() acknowledgeDto: AcknowledgeAlertDto,
+    @Request() req: any,
   ) {
-    return this.alertsService.acknowledge(id, acknowledgeDto);
+    return this.alertsService.acknowledge(id, req.user.userId);
   }
 
   @Patch(':id/resolve')

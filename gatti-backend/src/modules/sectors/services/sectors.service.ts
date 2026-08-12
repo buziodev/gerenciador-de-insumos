@@ -29,7 +29,8 @@ export class SectorsService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { code: { contains: search, mode: 'insensitive' } },
+        { costCenter: { contains: search, mode: 'insensitive' } },
+        { manager: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -39,10 +40,7 @@ export class SectorsService {
         where,
         skip,
         take,
-        include: {
-          users: { select: { id: true, firstName: true, lastName: true } },
-          printers: { select: { id: true, name: true } },
-        },
+        include: { printers: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.sector.count({ where }),
@@ -60,15 +58,14 @@ export class SectorsService {
   }
 
   async findOne(id: string) {
-    const sector = await this.prisma.sector.findUnique({
-      where: { id },
+    const sector = await this.prisma.sector.findFirst({
+      where: { id, deletedAt: null },
       include: {
-        users: { select: { id: true, firstName: true, lastName: true, email: true } },
         printers: { select: { id: true, name: true, model: true } },
       },
     });
 
-    if (!sector || sector.deletedAt) {
+    if (!sector) {
       throw new NotFoundException(`Setor com ID ${id} não encontrado`);
     }
 
@@ -96,10 +93,7 @@ export class SectorsService {
     return this.prisma.sector.update({
       where: { id },
       data: updateSectorDto,
-      include: {
-        users: { select: { id: true, firstName: true, lastName: true } },
-        printers: { select: { id: true, name: true } },
-      },
+      include: { printers: { select: { id: true, name: true } } },
     });
   }
 

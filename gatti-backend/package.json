@@ -12,7 +12,12 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.mjs",
+    "test:integration": "node scripts/integration-smoke.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "keywords": [],
   "author": "",

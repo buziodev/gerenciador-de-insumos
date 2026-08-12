@@ -33,6 +33,17 @@ import {
   UpdateSupplyRequest,
   ZabbixSync,
 } from '@/types';
+import {
+  CreateSectorRequest,
+  CreateUserRequest,
+  ListSectorsQuery,
+  ListUsersQuery,
+  Sector,
+  UpdateSectorRequest,
+  UpdateUserRequest,
+  User,
+  UserRole,
+} from '@/types';
 import { apiClient } from '@/config/api';
 
 // ============================================================================
@@ -253,10 +264,8 @@ export const alertsService = {
   /**
    * Reconhecer alerta
    */
-  acknowledge: async (id: string, acknowledgedBy: string) => {
-    const response = await apiClient.patch<Alert>(`/alerts/${id}/acknowledge`, {
-      acknowledgedBy,
-    });
+  acknowledge: async (id: string) => {
+    const response = await apiClient.patch<Alert>(`/alerts/${id}/acknowledge`);
     return response.data;
   },
 
@@ -388,5 +397,49 @@ export const healthService = {
   live: async () => {
     const response = await apiClient.get('/health/live');
     return response.data;
+  },
+};
+
+// ============================================================================
+// ADMINISTRATION
+// ============================================================================
+
+export const usersService = {
+  list: async (query?: ListUsersQuery) => {
+    const response = await apiClient.get<PaginatedResponse<User>>('/users', { params: query });
+    return response.data;
+  },
+  create: async (data: CreateUserRequest) => {
+    const response = await apiClient.post<User>('/users', data);
+    return response.data;
+  },
+  update: async (id: string, data: UpdateUserRequest) => {
+    const response = await apiClient.patch<User>(`/users/${id}`, data);
+    return response.data;
+  },
+  updateRole: async (id: string, role: UserRole) => {
+    const response = await apiClient.patch<User>(`/users/${id}/role`, { role });
+    return response.data;
+  },
+  delete: async (id: string) => {
+    await apiClient.delete(`/users/${id}`);
+  },
+};
+
+export const sectorsService = {
+  list: async (query?: ListSectorsQuery) => {
+    const response = await apiClient.get<PaginatedResponse<Sector>>('/sectors', { params: query });
+    return response.data;
+  },
+  create: async (data: CreateSectorRequest) => {
+    const response = await apiClient.post<Sector>('/sectors', data);
+    return response.data;
+  },
+  update: async (id: string, data: UpdateSectorRequest) => {
+    const response = await apiClient.patch<Sector>(`/sectors/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    await apiClient.delete(`/sectors/${id}`);
   },
 };

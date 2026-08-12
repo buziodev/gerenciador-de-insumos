@@ -20,7 +20,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
-  isActive: boolean;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
@@ -42,6 +42,28 @@ export interface LoginRequest {
 
 export interface RefreshTokenRequest {
   refreshToken: string;
+}
+
+export interface CreateUserRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+}
+
+export interface ListUsersQuery {
+  skip?: number;
+  take?: number;
+  role?: UserRole;
+  search?: string;
 }
 
 export interface AuthContextType {
@@ -221,6 +243,12 @@ export interface UpdateSectorRequest {
   manager?: string;
 }
 
+export interface ListSectorsQuery {
+  skip?: number;
+  take?: number;
+  search?: string;
+}
+
 // ============================================================================
 // SUPRIMENTOS
 // ============================================================================
@@ -319,7 +347,6 @@ export interface CreateStockMovementRequest {
   reason?: string;
   fromLocation?: string;
   toLocation?: string;
-  createdBy: string;
 }
 
 export interface UpdateStockLevelsRequest {
@@ -372,10 +399,6 @@ export interface CreateAlertRequest {
   type: AlertType;
   severity: AlertSeverity;
   message: string;
-}
-
-export interface AcknowledgeAlertRequest {
-  acknowledgedBy: string;
 }
 
 export interface ListAlertsQuery {
@@ -448,7 +471,6 @@ export interface CreateReportRequest {
   type: ReportType;
   title: string;
   description?: string;
-  generatedBy: string;
   filters?: Record<string, any>;
 }
 

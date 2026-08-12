@@ -50,15 +50,6 @@ export class CreateAlertDto {
   message!: string;
 }
 
-export class AcknowledgeAlertDto {
-  @ApiProperty({
-    example: 'user-123',
-    description: 'ID do usuário que reconheceu o alerta',
-  })
-  @IsString()
-  acknowledgedBy!: string;
-}
-
 export class ListAlertsQueryDto {
   @ApiProperty({
     example: 0,

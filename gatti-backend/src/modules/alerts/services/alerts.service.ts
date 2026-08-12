@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/prisma/prisma.service';
-import { CreateAlertDto, ListAlertsQueryDto, AcknowledgeAlertDto } from '../dtos/alert.dto';
+import { CreateAlertDto, ListAlertsQueryDto } from '../dtos/alert.dto';
 
 @Injectable()
 export class AlertsService {
@@ -15,7 +15,7 @@ export class AlertsService {
   async findAll(query: ListAlertsQueryDto) {
     const { skip = 0, take = 10, type, severity, isActive } = query;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
 
     if (type) {
       where.type = type;
@@ -51,8 +51,8 @@ export class AlertsService {
   }
 
   async findOne(id: string) {
-    const alert = await this.prisma.alert.findUnique({
-      where: { id },
+    const alert = await this.prisma.alert.findFirst({
+      where: { id, deletedAt: null },
     });
 
     if (!alert) {
@@ -62,20 +62,20 @@ export class AlertsService {
     return alert;
   }
 
-  async acknowledge(id: string, acknowledgeDto: AcknowledgeAlertDto) {
-    const alert = await this.findOne(id);
+  async acknowledge(id: string, acknowledgedBy: string) {
+    await this.findOne(id);
 
     return this.prisma.alert.update({
       where: { id },
       data: {
         acknowledgedAt: new Date(),
-        acknowledgedBy: acknowledgeDto.acknowledgedBy,
+        acknowledgedBy,
       },
     });
   }
 
   async resolve(id: string) {
-    const alert = await this.findOne(id);
+    await this.findOne(id);
 
     return this.prisma.alert.update({
       where: { id },
@@ -88,7 +88,7 @@ export class AlertsService {
 
   async getActiveAlerts() {
     return this.prisma.alert.findMany({
-      where: { isActive: true },
+      where: { isActive: true, deletedAt: null },
       orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
     });
   }
@@ -98,6 +98,7 @@ export class AlertsService {
       where: {
         isActive: true,
         severity: 'CRITICAL',
+        deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -108,6 +109,7 @@ export class AlertsService {
       where: {
         printerId,
         isActive: true,
+        deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
     });

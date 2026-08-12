@@ -15,6 +15,7 @@ import { GenerateReportDto, ListReportsQueryDto } from '../dtos/report.dto';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@modules/auth/guards/roles.guard';
 import { Roles } from '@modules/auth/decorators/roles.decorator';
+import { Request } from '@nestjs/common';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -27,8 +28,8 @@ export class ReportsController {
   @Roles('ADMIN', 'MANAGER')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Gerar novo relatório' })
-  async generateReport(@Body() generateReportDto: GenerateReportDto) {
-    return this.reportsService.generateReport(generateReportDto);
+  async generateReport(@Body() generateReportDto: GenerateReportDto, @Request() req: any) {
+    return this.reportsService.generateReport(generateReportDto, req.user.userId);
   }
 
   @Get()

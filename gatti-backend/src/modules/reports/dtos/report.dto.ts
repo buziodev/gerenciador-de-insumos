@@ -36,13 +36,6 @@ export class GenerateReportDto {
   description?: string;
 
   @ApiProperty({
-    example: 'user-123',
-    description: 'ID do usuário que gerou o relatório',
-  })
-  @IsString()
-  generatedBy!: string;
-
-  @ApiProperty({
     example: { startDate: '2024-06-01', endDate: '2024-06-30' },
     description: 'Filtros aplicados ao relatório',
     required: false,
