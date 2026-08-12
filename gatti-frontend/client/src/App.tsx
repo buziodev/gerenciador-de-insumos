@@ -19,6 +19,7 @@ import AlertsPage from "./pages/modules/Alerts";
 import ReportsPage from "./pages/modules/Reports";
 import AdminPage from "./pages/admin/Admin";
 import { Loader2 } from "lucide-react";
+import { UserRole } from "./types";
 
 function Router() {
   const { isLoading } = useAuth();
@@ -109,7 +110,7 @@ function Router() {
 
       <Route path="/admin">
         {() => (
-          <ProtectedRoute>
+          <ProtectedRoute requiredRoles={[UserRole.ADMIN]}>
             <MainLayout>
               <AdminPage />
             </MainLayout>

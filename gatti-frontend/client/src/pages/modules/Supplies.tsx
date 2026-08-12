@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useSupplies } from '@/hooks/useQueries';
 import { suppliesService } from '@/services/api';
 import { Supply, SupplyType } from '@/types';
+import { useCanAccess } from '@/components/layout/ProtectedRoute';
 
 type SupplyDraft = {
   name: string;
@@ -52,6 +53,9 @@ export default function SuppliesPage() {
   const [editing, setEditing] = useState<Supply | null>(null);
   const [draft, setDraft] = useState<SupplyDraft>(EMPTY_DRAFT);
   const [isSaving, setIsSaving] = useState(false);
+  const canCreate = useCanAccess('supplies', 'create');
+  const canUpdate = useCanAccess('supplies', 'update');
+  const canDelete = useCanAccess('supplies', 'delete');
 
   const filteredSupplies = supplies.filter((supply) =>
     [supply.name, supply.manufacturer, supply.model].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase()),
@@ -131,7 +135,7 @@ export default function SuppliesPage() {
           <h1 className="text-3xl font-bold">Suprimentos</h1>
           <p className="text-muted-foreground">Cadastre e acompanhe itens compatíveis com as impressoras.</p>
         </div>
-        <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo suprimento</Button>
+        {canCreate ? <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Novo suprimento</Button> : null}
       </div>
 
       <Card>
@@ -152,7 +156,7 @@ export default function SuppliesPage() {
                 {!isLoading && filteredSupplies.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum suprimento encontrado.</TableCell></TableRow> : null}
                 {!isLoading && filteredSupplies.map((supply) => <TableRow key={supply.id}>
                   <TableCell className="font-medium">{supply.name}</TableCell><TableCell>{TYPE_LABELS[supply.type]}</TableCell><TableCell>{supply.manufacturer}</TableCell><TableCell>{supply.nominalCapacity.toLocaleString('pt-BR')} pág.</TableCell><TableCell>{supply.unitCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                  <TableCell className="text-right"><Button size="icon" variant="ghost" aria-label={`Editar ${supply.name}`} onClick={() => openEdit(supply)}><Pencil className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={`Excluir ${supply.name}`} onClick={() => void removeSupply(supply)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                  <TableCell className="text-right">{canUpdate ? <Button size="icon" variant="ghost" aria-label={`Editar ${supply.name}`} onClick={() => openEdit(supply)}><Pencil className="h-4 w-4" /></Button> : null}{canDelete ? <Button size="icon" variant="ghost" aria-label={`Excluir ${supply.name}`} onClick={() => void removeSupply(supply)}><Trash2 className="h-4 w-4 text-destructive" /></Button> : null}</TableCell>
                 </TableRow>)}
               </TableBody>
             </Table>
