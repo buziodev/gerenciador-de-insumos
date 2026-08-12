@@ -11,6 +11,7 @@ import { ZabbixModule } from '@integrations/zabbix/zabbix.module';
 import { HealthModule } from '@modules/health/health.module';
 import { UsersModule } from '@modules/users/users.module';
 import { SectorsModule } from '@modules/sectors/sectors.module';
+import { SnmpModule } from '@integrations/snmp/snmp.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SectorsModule } from '@modules/sectors/sectors.module';
     AlertsModule,
     ReportsModule,
     ZabbixModule,
+    SnmpModule,
     HealthModule,
   ],
 })

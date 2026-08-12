@@ -109,6 +109,41 @@ export interface Printer {
   deletedAt?: string;
 }
 
+export interface SnmpConfiguration {
+  startIp: string;
+  endIp: string;
+  port: number;
+  version: string;
+  supportedModels: string[];
+  communityConfigured: boolean;
+}
+
+export interface SnmpDiscoveredDevice {
+  ipAddress: string;
+  hostname: string;
+  name: string;
+  model: string;
+  manufacturer: string;
+  serialNumber?: string;
+  status: PrinterStatus;
+  pageCount?: number;
+  tonerLevels: Array<{ color: TonerColor; percentageLevel: number; pageCount: number }>;
+}
+
+export interface SnmpDiscoveryResponse {
+  source: 'SNMP';
+  scanned: number;
+  discovered: number;
+  range: { startIp: string; endIp: string };
+  devices: SnmpDiscoveredDevice[];
+}
+
+export interface SnmpSyncResponse extends SnmpDiscoveryResponse {
+  created: number;
+  updated: number;
+  syncedAt: string;
+}
+
 export interface PrinterMetric {
   id: string;
   printerId: string;

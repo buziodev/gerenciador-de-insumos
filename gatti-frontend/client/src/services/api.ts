@@ -32,6 +32,9 @@ import {
   UpdateStockLevelsRequest,
   UpdateSupplyRequest,
   ZabbixSync,
+  SnmpConfiguration,
+  SnmpDiscoveryResponse,
+  SnmpSyncResponse,
 } from '@/types';
 import {
   CreateSectorRequest,
@@ -366,6 +369,27 @@ export const zabbixService = {
    */
   syncMetrics: async () => {
     const response = await apiClient.post<ZabbixSync>('/zabbix/sync/metrics');
+    return response.data;
+  },
+};
+
+// ============================================================================
+// SNMP
+// ============================================================================
+
+export const snmpService = {
+  getConfig: async () => {
+    const response = await apiClient.get<SnmpConfiguration>('/snmp/config');
+    return response.data;
+  },
+
+  discover: async () => {
+    const response = await apiClient.post<SnmpDiscoveryResponse>('/snmp/discover');
+    return response.data;
+  },
+
+  syncPrinters: async () => {
+    const response = await apiClient.post<SnmpSyncResponse>('/snmp/sync/printers');
     return response.data;
   },
 };
