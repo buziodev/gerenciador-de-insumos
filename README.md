@@ -1,162 +1,153 @@
-# GATTI - Gerenciador de Insumos
+# GATTI Supply Management System
 
-Sistema completo de gestão de impressoras, suprimentos e estoque com integração Zabbix.
+Sistema corporativo de gestão de impressoras, suprimentos, estoque e relatórios analíticos, integrado com Zabbix e suporte nativo à descoberta e monitoramento de ativos via SNMP.
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do Repositório
 
 ```
 gerenciador-de-insumos/
-├── gatti-backend/          # Backend NestJS (API REST)
-├── gatti-frontend/         # Frontend Next.js (React 19)
-├── mock-backend.js         # Mock backend para desenvolvimento
-└── README.md               # Este arquivo
+├── gatti-backend/          # Backend NestJS (API REST, Prisma ORM, RBAC, SNMP)
+├── gatti-frontend/         # Frontend Vite + React 19 + TypeScript + Tailwind CSS 4
+├── SNMP_SETUP.md           # Guia operacional da varredura SNMP sem Zabbix
+├── SNMP_QA_EVIDENCE.md     # Evidências de testes funcionais e de integração
+└── README.md               # Este documento
 ```
-
-## 🚀 Quick Start
-
-### Backend (NestJS)
-
-```bash
-cd gatti-backend
-npm install
-npm run dev
-```
-
-**Porta**: 3001  
-**Documentação**: http://localhost:3001/api/v1/docs
-
-### Frontend (Next.js)
-
-```bash
-cd gatti-frontend
-pnpm install
-pnpm dev
-```
-
-**Porta**: 3000  
-**URL**: http://localhost:3000
-
-### Mock Backend (para desenvolvimento)
-
-```bash
-node mock-backend.js
-```
-
-**Porta**: 3001
-
-## 🔐 Credenciais de Teste
-
-```
-Email: admin@gatti.com
-Senha: admin123
-```
-
-## 📊 Stack Tecnológico
-
-### Backend
-- **Framework**: NestJS 10+
-- **Database**: PostgreSQL + Prisma ORM
-- **Cache**: Redis
-- **Fila**: BullMQ
-- **Autenticação**: JWT
-- **Validação**: Class Validator
-- **Documentação**: Swagger/OpenAPI
-
-### Frontend
-- **Framework**: Next.js 15+
-- **UI**: React 19 + shadcn/ui
-- **Styling**: Tailwind CSS 4
-- **State Management**: TanStack Query
-- **Formulários**: React Hook Form
-- **Validação**: Zod
-- **Gráficos**: Recharts
-- **Icons**: Lucide Icons
-
-## 📚 Documentação
-
-- **Backend**: `gatti-backend/README.md`
-- **Frontend**: `gatti-frontend/README.md`
-- **Arquitetura**: `gatti-backend/ARCHITECTURE.md`
-- **Análise**: `gatti-backend/BACKEND_ANALYSIS.md`
-
-## 🔄 Integração com Zabbix
-
-O sistema sincroniza automaticamente:
-- Impressoras e suas métricas
-- Níveis de toner
-- Alertas de consumo
-- Histórico de manutenção
-
-## 🛠️ Desenvolvimento
-
-### Variáveis de Ambiente
-
-#### Backend (.env)
-```
-DATABASE_URL=postgresql://user:password@localhost:5432/gatti
-JWT_SECRET=sua-chave-secreta
-ZABBIX_API_URL=http://zabbix.example.com/api_jsonrpc.php
-ZABBIX_API_KEY=sua-chave-api
-PORT=3001
-```
-
-#### Frontend (.env.local)
-```
-VITE_API_BASE_URL=http://localhost:3001
-VITE_API_PREFIX=api/v1
-```
-
-## 📦 Deploy
-
-### Docker
-
-```bash
-cd gatti-backend
-docker-compose up -d
-```
-
-### Produção
-
-```bash
-# Backend
-npm run build
-npm run start
-
-# Frontend
-pnpm build
-pnpm start
-```
-
-## 🧪 Testes
-
-```bash
-# Backend
-npm run test
-npm run test:e2e
-
-# Frontend
-pnpm test
-```
-
-## 📝 Commits
-
-Commits realizados por: **Kauã B e J**
-
-## 🤝 Contribuindo
-
-1. Crie uma branch para sua feature: `git checkout -b feature/minha-feature`
-2. Commit suas mudanças: `git commit -m 'Add: minha feature'`
-3. Push para a branch: `git push origin feature/minha-feature`
-4. Abra um Pull Request
-
-## 📄 Licença
-
-MIT
-
-## 📞 Suporte
-
-Para dúvidas ou problemas, abra uma issue no repositório.
 
 ---
 
-**Desenvolvido com ❤️ por GATTI Dev Team**
+## 🚀 Guia Passo a Passo para Deploy em Produção
+
+Este guia descreve o procedimento completo para colocar o **GATTI** em produção em um servidor Linux (Ubuntu/Debian) com Node.js 20+, PostgreSQL 15+ e acesso à rede local de impressoras para descoberta SNMP.
+
+### 1. Pré-requisitos do Sistema
+
+- **Node.js**: Versão 20 LTS ou superior.
+- **Gerenciador de Pacotes**: `npm` (backend) e `pnpm` (frontend).
+- **Banco de Dados**: PostgreSQL 15+ com a extensão `citext` habilitada.
+- **Rede**: Rota direta entre o host do backend e a VLAN de impressoras (ex: `192.168.2.0/24`) caso utilize varredura SNMP nativa.
+
+### 2. Configuração do Backend (NestJS)
+
+Clone o repositório na máquina de destino e acesse o diretório do backend:
+
+```bash
+git clone https://github.com/buziodev/gerenciador-de-insumos.git
+cd gerenciador-de-insumos/gatti-backend
+```
+
+Instale as dependências e crie o arquivo de configuração `.env` a partir do modelo de exemplo:
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Edite o arquivo `.env` com as credenciais do seu banco de dados PostgreSQL, segredos JWT seguros e parâmetros SNMP:
+
+```dotenv
+NODE_ENV=production
+APP_PORT=3001
+APP_URL=https://gatti.suaempresa.com
+
+# Banco de Dados PostgreSQL
+DATABASE_URL=postgresql://gatti_user:SUA_SENHA_SEGURA@localhost:5432/gatti_prod
+
+# Segredos JWT (gere strings aleatórias longas)
+JWT_SECRET=sua-chave-jwt-secreta-e-longa
+JWT_EXPIRATION=24h
+JWT_REFRESH_SECRET=sua-chave-refresh-secreta-e-longa
+JWT_REFRESH_EXPIRATION=7d
+
+# Administrador Inicial (criado automaticamente pelo seed)
+INITIAL_ADMIN_EMAIL=admin@suaempresa.com
+INITIAL_ADMIN_PASSWORD=SenhaForte-2026!
+INITIAL_ADMIN_FIRST_NAME=Administrador
+INITIAL_ADMIN_LAST_NAME=GATTI
+
+# Descoberta SNMP para Ricoh P 311 / M 320 (opcional)
+SNMP_COMMUNITY=sua_comunidade_snmp_leitura
+SNMP_PORT=161
+SNMP_DISCOVERY_START_IP=192.168.2.2
+SNMP_DISCOVERY_END_IP=192.168.2.220
+```
+
+Execute as migrações do Prisma, gere o client e popule o administrador inicial:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+npm run prisma:seed
+```
+
+Compile o backend para produção e inicie o serviço (recomenda-se utilizar um gerenciador de processos como PM2 ou systemd):
+
+```bash
+npm run build
+# Exemplo com PM2:
+pm2 start dist/main.js --name "gatti-backend"
+```
+
+### 3. Configuração do Frontend (Vite / React)
+
+Acesse o diretório do frontend:
+
+```bash
+cd ../gatti-frontend
+pnpm install
+```
+
+Crie o arquivo `.env.production` para apontar para a API NestJS publicada:
+
+```env
+VITE_API_BASE_URL=https://gatti.suaempresa.com
+VITE_API_PREFIX=api/v1
+```
+
+Compile o frontend para produção:
+
+```bash
+pnpm build
+```
+
+O diretório `dist/` resultante conterá os arquivos estáticos prontos para publicação em servidores web (Nginx, Caddy) ou hospedagem de alta performance.
+
+---
+
+## 📊 Matriz de Papéis e Permissões (RBAC)
+
+O sistema conta com 4 níveis de acesso validados por tokens JWT com renovação segura e revogação por `jti`:
+
+| Perfil | Acesso aos Módulos | Permissões de Escrita | Operação SNMP |
+| --- | --- | --- | --- |
+| **ADMIN** | Completo (inclui Administração) | Total (Usuários, Setores, Impressoras, Estoque) | Configuração, Varrer, Sincronizar |
+| **MANAGER** | Módulos operacionais e relatórios | Criação e edição de ativos e relatórios | Varrer, Sincronizar |
+| **OPERATOR** | Módulos operacionais (Estoque, Alertas) | Movimentação de estoque e reconhecimento | Varrer |
+| **VIEWER** | Leitura em todos os módulos | Nenhuma (somente leitura) | Apenas consulta de configuração |
+
+---
+
+## 🔄 Descoberta SNMP Nativa (Sem Zabbix)
+
+Para ambientes que não utilizam Zabbix, o GATTI possui um módulo SNMP embutido capaz de varrer a faixa de IP configurada, identificar impressoras **Ricoh P 311** e **Ricoh M 320**, e sincronizar contadores de páginas e níveis de toner por cor [1] [2] [3].
+
+1. **Configuração**: Certifique-se de que `SNMP_COMMUNITY` está definido no `.env` do backend. Sem esta variável, as rotas de varredura rejeitam execuções com erro `400 Bad Request`.
+2. **Varredura (`POST /api/v1/snmp/discover`)**: Executa um scan concorrente na faixa IP e retorna os ativos responsivos sem alterar o banco de dados.
+3. **Sincronização (`POST /api/v1/snmp/sync/printers`)**: Descobre e persiste os ativos na base de dados, atualizando status online/offline e níveis de suprimentos.
+
+---
+
+## 📚 Documentação Adicional
+
+- **`SNMP_SETUP.md`**: Guia técnico detalhado sobre OIDs, Printer-MIB e requisitos de rede para varredura de impressoras.
+- **`SNMP_QA_EVIDENCE.md`**: Relatório de testes de integração (61/61 assertions aprovadas).
+
+## 📄 Referências
+
+[1] IETF. *RFC 3805: Printer MIB v2*. Disponível em: <https://datatracker.ietf.org/doc/html/rfc3805>.
+
+[2] Zabbix Community. *Template SNMP Ricoh Printers*. Disponível em: <https://raw.githubusercontent.com/zabbix/community-templates/main/Printers/Ricoh/template_ricoh_snmp_printers/6.0/template_ricoh_snmp_printers.yaml>.
+
+[3] Observium MIB Browser. *RicohPrivateMIB*. Disponível em: <https://mibs.observium.org/mib/RicohPrivateMIB/>.
+
+---
+Desenvolvido por **Kauã B e J** — Publicado no repositório oficial [buziodev/gerenciador-de-insumos](https://github.com/buziodev/gerenciador-de-insumos).
