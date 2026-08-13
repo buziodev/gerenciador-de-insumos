@@ -1,115 +1,57 @@
 # GATTI Supply Management System
 
-Sistema corporativo de gestão de impressoras, suprimentos, estoque e relatórios analíticos, integrado com Zabbix e suporte nativo à descoberta e monitoramento de ativos via SNMP.
+Sistema corporativo de gestão de impressoras, suprimentos, estoque e relatórios analíticos, integrado com Zabbix e suporte nativo à descoberta e monitoramento de ativos via SNMP. **Totalmente dockerizado para deploy simplificado com um único comando.**
 
 ## 📁 Estrutura do Repositório
 
 ```
 gerenciador-de-insumos/
 ├── gatti-backend/          # Backend NestJS (API REST, Prisma ORM, RBAC, SNMP)
-├── gatti-frontend/         # Frontend Vite + React 19 + TypeScript + Tailwind CSS 4
+├── gatti-frontend/         # Frontend Vite + React 19 + TypeScript + Nginx
+├── docker-compose.yml      # Orquestração Docker de todo o ecossistema
+├── .env.docker             # Exemplo de variáveis de ambiente para Docker
 ├── SNMP_SETUP.md           # Guia operacional da varredura SNMP sem Zabbix
-├── SNMP_QA_EVIDENCE.md     # Evidências de testes funcionais e de integração
-└── README.md               # Este documento
+└── SNMP_QA_EVIDENCE.md     # Evidências de testes funcionais e de integração
 ```
 
 ---
 
-## 🚀 Guia Passo a Passo para Deploy em Produção
+## 🐳 Deploy Completo com Docker (Recomendado)
 
-Este guia descreve o procedimento completo para colocar o **GATTI** em produção em um servidor Linux (Ubuntu/Debian) com Node.js 20+, PostgreSQL 15+ e acesso à rede local de impressoras para descoberta SNMP.
+Para colocar toda a aplicação (PostgreSQL, Backend NestJS e Frontend Nginx) em funcionamento em qualquer servidor Linux ou ambiente com Docker, siga os passos abaixo:
 
-### 1. Pré-requisitos do Sistema
+### 1. Pré-requisitos
+- **Docker** (versão 24+)
+- **Docker Compose** (versão 2+ ou plugin `docker compose`)
 
-- **Node.js**: Versão 20 LTS ou superior.
-- **Gerenciador de Pacotes**: `npm` (backend) e `pnpm` (frontend).
-- **Banco de Dados**: PostgreSQL 15+ com a extensão `citext` habilitada.
-- **Rede**: Rota direta entre o host do backend e a VLAN de impressoras (ex: `192.168.2.0/24`) caso utilize varredura SNMP nativa.
-
-### 2. Configuração do Backend (NestJS)
-
-Clone o repositório na máquina de destino e acesse o diretório do backend:
-
+### 2. Clonar o Repositório
 ```bash
 git clone https://github.com/buziodev/gerenciador-de-insumos.git
-cd gerenciador-de-insumos/gatti-backend
+cd gerenciador-de-insumos
 ```
 
-Instale as dependências e crie o arquivo de configuração `.env` a partir do modelo de exemplo:
+### 3. Configurar Variáveis de Ambiente (Opcional)
+Se desejar alterar senhas, chaves JWT ou a comunidade SNMP padrão (`public`), edite o arquivo `.env.docker` ou defina as variáveis diretamente. Por padrão, o arquivo já vem pronto para uso imediato em homologação/testes.
+
+### 4. Subir toda a Estrutura
+Execute o comando de construção e subida dos containers em segundo plano:
 
 ```bash
-npm install
-cp .env.example .env
+docker compose up --build -d
 ```
 
-Edite o arquivo `.env` com as credenciais do seu banco de dados PostgreSQL, segredos JWT seguros e parâmetros SNMP:
+O **Docker Compose** fará automaticamente:
+1. Subida do banco **PostgreSQL 15** com volume persistente.
+2. Build da imagem do **Backend NestJS**, execução das migrações do Prisma, aplicação do seed inicial e inicialização da API na porta `3001`.
+3. Build da imagem do **Frontend Vite/React** otimizado e servido via **Nginx** na porta `80`.
 
-```dotenv
-NODE_ENV=production
-APP_PORT=3001
-APP_URL=https://gatti.suaempresa.com
+### 5. Acesso ao Sistema
+- **Aplicação Web (Frontend)**: `http://localhost` (porta 80)
+- **API REST / Swagger**: `http://localhost:3001/api/v1/docs`
 
-# Banco de Dados PostgreSQL
-DATABASE_URL=postgresql://gatti_user:SUA_SENHA_SEGURA@localhost:5432/gatti_prod
-
-# Segredos JWT (gere strings aleatórias longas)
-JWT_SECRET=sua-chave-jwt-secreta-e-longa
-JWT_EXPIRATION=24h
-JWT_REFRESH_SECRET=sua-chave-refresh-secreta-e-longa
-JWT_REFRESH_EXPIRATION=7d
-
-# Administrador Inicial (criado automaticamente pelo seed)
-INITIAL_ADMIN_EMAIL=admin@suaempresa.com
-INITIAL_ADMIN_PASSWORD=SenhaForte-2026!
-INITIAL_ADMIN_FIRST_NAME=Administrador
-INITIAL_ADMIN_LAST_NAME=GATTI
-
-# Descoberta SNMP para Ricoh P 311 / M 320 (opcional)
-SNMP_COMMUNITY=sua_comunidade_snmp_leitura
-SNMP_PORT=161
-SNMP_DISCOVERY_START_IP=192.168.2.2
-SNMP_DISCOVERY_END_IP=192.168.2.220
-```
-
-Execute as migrações do Prisma, gere o client e popule o administrador inicial:
-
-```bash
-npx prisma migrate deploy
-npx prisma generate
-npm run prisma:seed
-```
-
-Compile o backend para produção e inicie o serviço (recomenda-se utilizar um gerenciador de processos como PM2 ou systemd):
-
-```bash
-npm run build
-# Exemplo com PM2:
-pm2 start dist/main.js --name "gatti-backend"
-```
-
-### 3. Configuração do Frontend (Vite / React)
-
-Acesse o diretório do frontend:
-
-```bash
-cd ../gatti-frontend
-pnpm install
-```
-
-Crie o arquivo `.env.production` para apontar para a API NestJS publicada:
-
-```env
-VITE_API_BASE_URL=https://gatti.suaempresa.com
-VITE_API_PREFIX=api/v1
-```
-
-Compile o frontend para produção:
-
-```bash
-pnpm build
-```
-
-O diretório `dist/` resultante conterá os arquivos estáticos prontos para publicação em servidores web (Nginx, Caddy) ou hospedagem de alta performance.
+#### Credenciais Iniciais Criadas pelo Seed:
+- **Email**: `admin@gatti.test`
+- **Senha**: `AdminPassword-2026!`
 
 ---
 
@@ -126,11 +68,11 @@ O sistema conta com 4 níveis de acesso validados por tokens JWT com renovação
 
 ---
 
-## 🔄 Descoberta SNMP Nativa (Sem Zabbix)
+## 🔄 Descoberta SNMP Nativa (Comunidade `public`)
 
-Para ambientes que não utilizam Zabbix, o GATTI possui um módulo SNMP embutido capaz de varrer a faixa de IP configurada, identificar impressoras **Ricoh P 311** e **Ricoh M 320**, e sincronizar contadores de páginas e níveis de toner por cor [1] [2] [3].
+Para ambientes que não utilizam Zabbix, o GATTI possui um módulo SNMP embutido capaz de varrer a faixa de IP configurada (`192.168.2.2–192.168.2.220`), identificar impressoras **Ricoh P 311** e **Ricoh M 320**, e sincronizar contadores de páginas e níveis de toner por cor [1] [2] [3].
 
-1. **Configuração**: Certifique-se de que `SNMP_COMMUNITY` está definido no `.env` do backend. Sem esta variável, as rotas de varredura rejeitam execuções com erro `400 Bad Request`.
+1. **Configuração**: O Docker Compose já injeta `SNMP_COMMUNITY=public`.
 2. **Varredura (`POST /api/v1/snmp/discover`)**: Executa um scan concorrente na faixa IP e retorna os ativos responsivos sem alterar o banco de dados.
 3. **Sincronização (`POST /api/v1/snmp/sync/printers`)**: Descobre e persiste os ativos na base de dados, atualizando status online/offline e níveis de suprimentos.
 

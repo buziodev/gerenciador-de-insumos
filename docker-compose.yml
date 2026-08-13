@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: gatti-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: gatti_user
+      POSTGRES_PASSWORD: gatti_password_prod
+      POSTGRES_DB: gatti_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gatti_user -d gatti_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./gatti-backend
+      dockerfile: Dockerfile
+    container_name: gatti-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_PORT: 3001
+      DATABASE_URL: postgresql://gatti_user:gatti_password_prod@postgres:5432/gatti_db?schema=public
+      JWT_SECRET: super-secret-jwt-key-change-in-production
+      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production
+      INITIAL_ADMIN_EMAIL: admin@gatti.test
+      INITIAL_ADMIN_PASSWORD: AdminPassword-2026!
+      INITIAL_ADMIN_FIRST_NAME: Admin
+      INITIAL_ADMIN_LAST_NAME: GATTI
+      SNMP_COMMUNITY: public
+      SNMP_DISCOVERY_START_IP: 192.168.2.2
+      SNMP_DISCOVERY_END_IP: 192.168.2.220
+    ports:
+      - "3001:3001"
+    command: >
+      sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/main.js"
+
+  frontend:
+    build:
+      context: ./gatti-frontend
+      dockerfile: Dockerfile
+    container_name: gatti-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
